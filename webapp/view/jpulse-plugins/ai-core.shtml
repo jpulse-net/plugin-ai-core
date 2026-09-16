@@ -4,7 +4,7 @@
  * @tagline         AI Core plugin overview
  * @description     Dashboard card and overview for the AI agent server core
  * @file            plugins/ai-core/webapp/view/jpulse-plugins/ai-core.shtml
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -18,6 +18,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Core Plugin - {{app.site.shortName}}</title>
     {{file.include "jpulse-header.tmpl"}}
+    <style>
+    .local-stat-text {
+        font-size: 1.15em;
+        font-weight: 600;
+        word-break: break-word;
+    }
+
+    .local-capability-block {
+        margin-top: 8px;
+        margin-bottom: 24px;
+    }
+
+    .local-capability-block h2 {
+        margin-bottom: 8px;
+    }
+
+    .local-row-unavailable td {
+        color: var(--jp-theme-text-secondary, #666);
+    }
+
+    .local-help-links {
+        margin-top: 8px;
+        line-height: 1.8;
+    }
+    </style>
 </head>
 <body>
     {{#component "pluginCards.aiCore" order=40}}
@@ -33,16 +58,162 @@
                 <h1><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Core Plugin</h1>
                 <span class="jp-subtitle">Agent server core — tools, turns, quota, HTTP</span>
             </div>
+            <div id="ai-capability-status">Loading…</div>
+            <div id="ai-capability-stats-card" class="jp-card jp-mb-30" hidden>
+                <div id="ai-capability-stats" class="jp-stats-grid">
+                    <div class="jp-stat-card">
+                        <div class="jp-stat-number local-stat-text" id="ai-capability-default">—</div>
+                        <div class="jp-stat-label">Default model</div>
+                    </div>
+                    <div class="jp-stat-card">
+                        <div class="jp-stat-number" id="ai-capability-model-count">—</div>
+                        <div class="jp-stat-label">Models</div>
+                    </div>
+                    <div class="jp-stat-card">
+                        <div class="jp-stat-number" id="ai-capability-tool-count">—</div>
+                        <div class="jp-stat-label">Tools</div>
+                    </div>
+                    <div class="jp-stat-card">
+                        <div class="jp-stat-number local-stat-text" id="ai-capability-transport">—</div>
+                        <div class="jp-stat-label">Transport</div>
+                    </div>
+                </div>
+            </div>
+            <div id="ai-capability-models-wrap" class="local-capability-block" hidden>
+                <h2>Models</h2>
+                <div class="jp-table-container">
+                    <table class="jp-table" id="ai-capability-models">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Model</th>
+                                <th>Label</th>
+                                <th>Vision</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="ai-capability-quota-wrap" class="local-capability-block" hidden>
+                <h2>Quota</h2>
+                <div class="jp-table-container">
+                    <table class="jp-table" id="ai-capability-quota">
+                        <thead>
+                            <tr>
+                                <th>Dimension</th>
+                                <th>Period</th>
+                                <th>Used</th>
+                                <th>Limit</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="ai-capability-tools-wrap" class="local-capability-block" hidden>
+                <h2>Tools</h2>
+                <p id="ai-capability-tools"></p>
+            </div>
             <p>A site registers scope and tools through hooks. This plugin runs turns, enforces authorization and quota, and streams replies over HTTP.</p>
-            <ul>
+            <ul class="local-help-links">
                 <li><a href="/admin/config.shtml">Site Configuration → AI</a></li>
                 <li><a href="/admin/ai-usage.shtml">AI usage</a></li>
-                <li><a href="/admin/plugin-config.shtml?plugin=ai-core">Debug dumps (plugin config)</a></li>
+                <li><a href="/admin/plugin-config.shtml?plugin=ai-core">AI Core configuration</a></li>
+                <li><a href="/admin/plugins.shtml">Plugin management</a></li>
                 <li><a href="/jpulse-plugins/ai-mock.shtml">AI Mock</a></li>
                 <li><a href="/jpulse-docs/installed-plugins/ai-core/README">AI Core guide</a></li>
             </ul>
+            <div class="jp-info-box">
+                Live capability:
+                <a href="/api/1/ai/capability">/api/1/ai/capability</a>
+            </div>
         </div>
     </div>
     {{file.include "jpulse-footer.tmpl"}}
+    <script>
+        jPulse.dom.ready(async function () {
+            const status = document.getElementById('ai-capability-status');
+            const statsCard = document.getElementById('ai-capability-stats-card');
+            const modelsWrap = document.getElementById('ai-capability-models-wrap');
+            const quotaWrap = document.getElementById('ai-capability-quota-wrap');
+            const toolsWrap = document.getElementById('ai-capability-tools-wrap');
+
+            function fillRow(tableId, values, unavailable) {
+                const body = document.querySelector('#' + tableId + ' tbody');
+                const tr = document.createElement('tr');
+                if (unavailable) {
+                    tr.className = 'local-row-unavailable';
+                }
+                values.forEach(function (value) {
+                    const td = document.createElement('td');
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            }
+
+            const result = await jPulse.api.get('/api/1/ai/capability');
+            if (!result || !result.success) {
+                status.textContent = (result && result.error) || 'Could not load capability.';
+                return;
+            }
+            const data = result.data || {};
+            const models = data.models || [];
+            const tools = data.tools || [];
+            const withheld = data.withheld || [];
+            const quotaRows = (data.quota && data.quota.rows) || [];
+            const defaultModel = data.defaultModel;
+            let defaultLabel = '—';
+            if (defaultModel) {
+                defaultLabel = defaultModel.label
+                    || (defaultModel.provider + '/' + defaultModel.model);
+            }
+            document.getElementById('ai-capability-default').textContent = defaultLabel;
+            document.getElementById('ai-capability-model-count').textContent = String(models.length);
+            document.getElementById('ai-capability-tool-count').textContent = String(tools.length);
+            document.getElementById('ai-capability-transport').textContent = data.transport || '—';
+            status.textContent = '';
+            statsCard.hidden = false;
+
+            models.forEach(function (row) {
+                const unavailable = row.available === false;
+                const vision = row.capabilities && row.capabilities.vision === true;
+                fillRow('ai-capability-models', [
+                    row.provider || '',
+                    row.model || '',
+                    row.label || '',
+                    vision ? 'yes' : 'no',
+                    unavailable ? ('unavailable' + (row.reason ? ' (' + row.reason + ')' : '')) : 'available'
+                ], unavailable);
+            });
+            if (models.length) {
+                modelsWrap.hidden = false;
+            }
+
+            quotaRows.forEach(function (row) {
+                fillRow('ai-capability-quota', [
+                    row.dimension || '',
+                    row.periodKey || row.period || '',
+                    String(row.used == null ? 0 : row.used),
+                    String(row.limit == null ? '—' : row.limit)
+                ], false);
+            });
+            if (quotaRows.length) {
+                quotaWrap.hidden = false;
+            }
+
+            const toolNames = tools.map(function (tool) {
+                return typeof tool === 'string' ? tool : (tool.name || '');
+            }).filter(Boolean);
+            let toolsText = toolNames.length ? toolNames.join(', ') : 'None offered for this scope.';
+            if (withheld.length) {
+                toolsText += ' Withheld: ' + withheld.length + '.';
+            }
+            document.getElementById('ai-capability-tools').textContent = toolsText;
+            toolsWrap.hidden = false;
+        });
+    </script>
 </body>
 </html>

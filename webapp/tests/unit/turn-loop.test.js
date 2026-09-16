@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -376,6 +376,39 @@ describe('turn loop', () => {
         abort.abort();
         const result = await running;
         expect(result.status).toBe('canceled');
+    });
+
+    test('persists a mid-thread provider/model switch onto the thread', async () => {
+        const thread = await seedThread();
+        expect(thread.provider).toBe('');
+        const first = await runTurn({
+            actor: testActor(),
+            thread,
+            userText: '[mock:text] stay',
+            provider: 'ai-mock',
+            model: 'mock-unpriced',
+            settings,
+            hookManager: hooksWith(),
+            threadModel: AiThreadModel,
+            turnModel: AiTurnModel,
+            usageModel: AiUsageModel,
+            redisManager: { isRedisAvailable: () => false }
+        });
+        expect(first.thread.provider).toBe('ai-mock');
+        expect(first.thread.model).toBe('mock-unpriced');
+        const second = await runTurn({
+            actor: testActor(),
+            thread: first.thread,
+            userText: '[mock:text] again',
+            settings,
+            hookManager: hooksWith(),
+            threadModel: AiThreadModel,
+            turnModel: AiTurnModel,
+            usageModel: AiUsageModel,
+            redisManager: { isRedisAvailable: () => false }
+        });
+        expect(second.turn.model).toBe('mock-unpriced');
+        expect(second.thread.model).toBe('mock-unpriced');
     });
 
     test('requestCancel aborts an attached hang', async () => {

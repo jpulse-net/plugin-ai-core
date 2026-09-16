@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.0
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.1
 
 A jPulse site gets an agent by configuring one rather than building one. This page is the server half: tools, quota, turns, and HTTP. The chat panel, shared tool modules, propose/apply, and attachments arrive in later releases of this plugin.
 
@@ -58,14 +58,17 @@ Until the chat panel ships, start a thread and a turn over HTTP:
 ```
 POST /api/1/ai/thread          { "scopeType": "doc", "scopeId": "<id>" }
 POST /api/1/ai/thread/:id/turn { "text": "Summarize this document." }
+PUT  /api/1/ai/thread/:id      { "label": "Outline", "provider": "ai-mock", "model": "mock-echo" }
 POST /api/1/ai/thread/:id/cancel
 ```
 
 The turn call is Server-Sent Events. Cancel is the third call — not closing the SSE connection. On this Node + POST+SSE path, HTTP close often fires when the JSON body is consumed, so treating it as “client gone” would abort every turn.
 
+A turn that names `provider` and `model` records that pair on the thread so the next find-or-create keeps it. `PUT /api/1/ai/thread/:id` can change the pair (and the label) without starting a turn. A pair that is not on the live menu is rejected.
+
 `ai-mock` answers without an API key. Prefix `[mock:text]`, `[mock:tools]`, `[mock:retry]`, `[mock:fatal]`, `[mock:slow]`, or `[mock:hang]` to pick a script.
 
-`GET /api/1/ai/capability?scopeType=doc&scopeId=<id>` returns the transport (`http` when no client-host tool is offered), the offered tools, the model menu, and quota.
+`GET /api/1/ai/capability?scopeType=doc&scopeId=<id>` returns the transport (`http` when no client-host tool is offered), the offered tools, the model menu, and quota. A registered provider with `configured: false` (no API key) is omitted from the menu. `?hasImages=1` leaves those rows in the list and marks non-vision models `{ available: false, reason: "vision" }` — the seam the picker uses before attachments exist.
 
 ## Tool descriptor
 
@@ -128,12 +131,12 @@ Four of these are what the simple case uses.
 
 ## Admin
 
-Site Configuration → AI holds the master switch, allowed roles, default provider/model, quota caps, loop limits, tool policy, retention, auto-title, and site instructions. The first completed turn on an unlabeled thread gets a short label from the user text when auto-title is on.
+Site Configuration → AI holds the master switch, allowed roles, default provider/model, quota caps, loop limits, tool policy, retention, auto-title, and site instructions. The default is the admin pair when both fields match a live menu row; a provider alone picks that provider's first model; otherwise the first configured model. An empty allowed list keeps every configured provider on the menu (including `ai-mock`). The first completed turn on an unlabeled thread gets a short label from the user text when auto-title is on. `/jpulse-plugins/ai-core.shtml` shows the live capability probe (default model, menu, quota) and links to `/api/1/ai/capability`.
 
-Debug dumps stay on Admin → Plugins → ai-core so they are harder to leave on. That page also links to Site Configuration, AI usage, and this guide. When dumps are on, each round logs the assembled prompt and a clipped response line.
+Debug dumps stay on Admin → Plugins → ai-core so they are harder to leave on. That page also links to Site Configuration, the AI Core overview, AI usage, and this guide. When dumps are on, each round logs the assembled prompt and a clipped response line.
 
 Admin → AI usage reports per-subject requests, tokens, and cost by period, with over-quota and unknown-cost flags. Daily and monthly rows are written on every settle.
 
 ## Later
 
-Client-host tools and the floating chat panel, propose/apply, and attachments are not in 1.0.0. `host: 'client'` descriptors are accepted and withheld, not rejected.
+Client-host tools and the floating chat panel, propose/apply, and attachments are not in 1.0.1. `host: 'client'` descriptors are accepted and withheld, not rejected.

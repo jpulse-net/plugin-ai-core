@@ -3,7 +3,7 @@
  * @tagline         Agent layer public surface
  * @description     Turn loop, quota, lease, prompt, providers — no transport imports
  * @file            plugins/ai-core/webapp/utils/agent/index.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -16,13 +16,17 @@ export { broadcastCancel, cancelChannel, isCancelRequested, requestCancel, subsc
 export { acquireLease, clearLocalLeases, releaseLease } from './lease.js';
 export { assemblePrompt, historyToMessages } from './prompt.js';
 export {
+    chooseProviderModel,
     computeCost,
     filterAllowedModels,
+    gateModelsForVision,
     hasCapability,
     listProviders,
     normalizeProvider,
+    pairOnMenu,
     pickDefaultModel,
-    priceForModel
+    priceForModel,
+    queryHasImages
 } from './providers.js';
 export {
     DEFAULT_CAPS,

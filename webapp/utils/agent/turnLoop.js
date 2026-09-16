@@ -3,7 +3,7 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -17,8 +17,13 @@ import { onBehalfOfLogSuffix, threadOwner } from '../tools/actor.js';
 import { broadcastCancel, clearCancel, isCancelRequested } from './cancel.js';
 import { acquireLease, releaseLease } from './lease.js';
 import { assemblePrompt, historyToMessages } from './prompt.js';
-import { computeCost, listProviders, pickDefaultModel, priceForModel } from './providers.js';
-import { filterAllowedModels } from './providers.js';
+import {
+    chooseProviderModel,
+    computeCost,
+    filterAllowedModels,
+    listProviders,
+    priceForModel
+} from './providers.js';
 
 const RETRYABLE_WAIT_MS = [500, 1500, 3500];
 const DEBUG_PRIOR_MAX = 1500;
@@ -199,10 +204,7 @@ export async function runTurn(params) {
     try {
         const providers = await listProviders(hookManager);
         const menu = filterAllowedModels(providers, settings);
-        const chosen = params.provider && params.model
-            ? menu.find(row => row.provider === params.provider && row.model === params.model)
-                || { provider: params.provider, model: params.model }
-            : pickDefaultModel(menu, settings);
+        const chosen = chooseProviderModel(menu, settings, params, thread);
         if (!chosen) {
             const error = new Error('No provider is available');
             error.code = 'AI_NO_PROVIDER';
@@ -213,6 +215,17 @@ export async function runTurn(params) {
             priceTable: {},
             maxTokens: 4096
         };
+
+        if (thread.provider !== chosen.provider || thread.model !== chosen.model) {
+            const persisted = await threadModel.setProviderModel(
+                thread._id,
+                chosen.provider,
+                chosen.model
+            );
+            if (persisted) {
+                thread = persisted;
+            }
+        }
 
         const seq = await turnModel.nextSeq(thread._id);
         turn = await turnModel.create({

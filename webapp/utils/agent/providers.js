@@ -3,7 +3,7 @@
  * @tagline         Provider registry and capability map
  * @description     capabilities is a map; unknown keys read false
  * @file            plugins/ai-core/webapp/utils/agent/providers.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -36,7 +36,8 @@ export function normalizeProvider(raw) {
         models: Array.isArray(raw.models) ? raw.models : [],
         capabilities,
         priceTable: raw.priceTable && typeof raw.priceTable === 'object' ? raw.priceTable : {},
-        maxTokens: Number.isFinite(raw.maxTokens) ? raw.maxTokens : 4096
+        maxTokens: Number.isFinite(raw.maxTokens) ? raw.maxTokens : 4096,
+        configured: raw.configured !== false
     };
 }
 
@@ -60,12 +61,16 @@ export async function listProviders(hookManager = global.HookManager) {
 }
 
 /**
- * Filter the admin allowed list by providers that actually registered.
- * Empty allowed list means every registered model.
+ * Filter the admin allowed list by providers that actually registered
+ * and have a usable credential (`configured !== false`).
+ * Empty allowed list means every registered, configured model.
  */
 export function filterAllowedModels(providers, settings = {}) {
     const registered = [];
     for (const provider of providers) {
+        if (provider.configured === false) {
+            continue;
+        }
         for (const model of provider.models || []) {
             const id = typeof model === 'string' ? model : model.id;
             if (!id) {
@@ -95,14 +100,65 @@ export function filterAllowedModels(providers, settings = {}) {
 }
 
 export function pickDefaultModel(menu, settings = {}) {
-    if (settings.defaultProvider && settings.defaultModel) {
-        const match = menu.find(row =>
-            row.provider === settings.defaultProvider && row.model === settings.defaultModel);
-        if (match) {
-            return match;
+    const provider = settings.defaultProvider;
+    const model = settings.defaultModel;
+    if (provider && model) {
+        const exact = (menu || []).find(row =>
+            row.provider === provider && row.model === model);
+        if (exact) {
+            return exact;
         }
     }
-    return menu[0] || null;
+    if (provider) {
+        const firstOfProvider = (menu || []).find(row => row.provider === provider);
+        if (firstOfProvider) {
+            return firstOfProvider;
+        }
+    }
+    return (menu && menu[0]) || null;
+}
+
+/**
+ * Turn or write: explicit pair, else the thread's stored pair if still on
+ * the menu, else the site default.
+ */
+export function chooseProviderModel(menu, settings = {}, params = {}, thread = {}) {
+    if (params.provider && params.model) {
+        return menu.find(row => row.provider === params.provider && row.model === params.model)
+            || { provider: params.provider, model: params.model };
+    }
+    if (thread.provider && thread.model) {
+        const fromThread = menu.find(row =>
+            row.provider === thread.provider && row.model === thread.model);
+        if (fromThread) {
+            return fromThread;
+        }
+    }
+    return pickDefaultModel(menu, settings);
+}
+
+export function pairOnMenu(menu, provider, model) {
+    return (menu || []).some(row => row.provider === provider && row.model === model);
+}
+
+/**
+ * Grey out non-vision models when the thread has images. Does not drop rows.
+ */
+export function gateModelsForVision(menu, { hasImages } = {}) {
+    if (!hasImages) {
+        return menu;
+    }
+    return (menu || []).map((row) => {
+        if (row.capabilities?.vision === true) {
+            return row;
+        }
+        return { ...row, available: false, reason: 'vision' };
+    });
+}
+
+export function queryHasImages(query) {
+    const value = query && query.hasImages;
+    return value === '1' || value === 'true' || value === true || value === 1;
 }
 
 export function priceForModel(provider, modelId) {

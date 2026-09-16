@@ -3,7 +3,7 @@
  * @tagline         Conversation threads
  * @description     One active thread per (scopeType, scopeId, createdBy); find-or-create lives here
  * @file            plugins/ai-core/webapp/model/aiThread.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -126,7 +126,7 @@ class AiThreadModel {
     }
 
     static async rename(id, label) {
-        return this._update(id, { label: String(label || ''), updatedAt: new Date() });
+        return this.updateThread(id, { label });
     }
 
     static async archive(id) {
@@ -134,11 +134,21 @@ class AiThreadModel {
     }
 
     static async setProviderModel(id, provider, model) {
-        return this._update(id, {
-            provider: provider || '',
-            model: model || '',
-            updatedAt: new Date()
-        });
+        return this.updateThread(id, { provider, model });
+    }
+
+    static async updateThread(id, fields = {}) {
+        const set = { updatedAt: new Date() };
+        if (fields.label !== undefined) {
+            set.label = String(fields.label || '');
+        }
+        if (fields.provider !== undefined) {
+            set.provider = String(fields.provider || '');
+        }
+        if (fields.model !== undefined) {
+            set.model = String(fields.model || '');
+        }
+        return this._update(id, set);
     }
 
     static async touch(id) {

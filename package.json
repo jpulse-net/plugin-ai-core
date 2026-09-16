@@ -1,6 +1,6 @@
 {
     "name": "@jpulse-net/plugin-ai-core",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "module",
     "description": "jPulse AI agent bundle: ai-core plus the ai-mock provider",
     "keywords": ["jpulse", "jpulse-plugin", "ai", "agent"],
@@ -18,6 +18,7 @@
         "plugins"
     ],
     "scripts": {
+        "test": "npx jest plugins/ai-core/webapp/tests/unit --runInBand",
         "prepack": "node ../../bin/jpulse-framework.js plugin stage-bundle",
         "postpack": "node ../../bin/jpulse-framework.js plugin unstage-bundle"
     }

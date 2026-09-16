@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -16,11 +16,14 @@ import {
     broadcastCancel,
     filterAllowedModels,
     firstExceededCap,
+    gateModelsForVision,
     listProviders,
     loadSettings,
     onAiQuotaCheck,
     onAiQuotaSettle,
+    pairOnMenu,
     pickDefaultModel,
+    queryHasImages,
     quotaSnapshot,
     roleAllowed,
     runTurn,
@@ -207,7 +210,8 @@ class AiCoreController {
                     defaultModel: {
                         type: 'string',
                         default: '',
-                        label: '{{i18n.view.ui.ai.config.defaultModel}}'
+                        label: '{{i18n.view.ui.ai.config.defaultModel}}',
+                        help: '{{i18n.view.ui.ai.config.defaultModelHelp}}'
                     },
                     allowedModels: {
                         type: 'string',
@@ -361,7 +365,9 @@ class AiCoreController {
             logReq(req, 'aiCore.apiCapability', actor);
             const resolved = await resolveTools(actor, { policy: settings.policy });
             const providers = await listProviders();
-            const menu = filterAllowedModels(providers, settings);
+            const menu = gateModelsForVision(filterAllowedModels(providers, settings), {
+                hasImages: queryHasImages(req.query)
+            });
             const quota = await quotaSnapshot(actor.username, settings.caps);
             res.json({
                 success: true,
@@ -460,7 +466,7 @@ class AiCoreController {
             if (!gated) {
                 return;
             }
-            const { actor } = gated;
+            const { settings, actor } = gated;
             logReq(req, 'aiCore.apiRenameThread', actor);
             const thread = await this._ownedThread(req, actor, req.params.id);
             if (thread == null) {
@@ -469,7 +475,36 @@ class AiCoreController {
             if (thread === false) {
                 return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
             }
-            const updated = await AiThreadModel.rename(thread._id, req.body?.label || '');
+            const body = req.body && typeof req.body === 'object' ? req.body : {};
+            const fields = {};
+            if (Object.prototype.hasOwnProperty.call(body, 'label')) {
+                fields.label = body.label;
+            }
+            if (Object.prototype.hasOwnProperty.call(body, 'provider')
+                || Object.prototype.hasOwnProperty.call(body, 'model')) {
+                const provider = Object.prototype.hasOwnProperty.call(body, 'provider')
+                    ? String(body.provider || '')
+                    : thread.provider;
+                const model = Object.prototype.hasOwnProperty.call(body, 'model')
+                    ? String(body.model || '')
+                    : thread.model;
+                const providers = await listProviders();
+                const menu = filterAllowedModels(providers, settings);
+                if (!pairOnMenu(menu, provider, model)) {
+                    return sendError(
+                        req,
+                        res,
+                        400,
+                        'That provider and model are not available',
+                        'AI_MODEL_NOT_ALLOWED'
+                    );
+                }
+                fields.provider = provider;
+                fields.model = model;
+            }
+            const updated = Object.keys(fields).length
+                ? await AiThreadModel.updateThread(thread._id, fields)
+                : thread;
             res.json({ success: true, data: updated });
             logOk(req, 'aiCore.apiRenameThread', actor, String(thread._id));
         } catch (error) {

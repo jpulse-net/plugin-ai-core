@@ -3,7 +3,7 @@
  * @tagline         Server-host tool execution
  * @description     Four gates, then onAiToolExecute; client-host is withheld until W-225
  * @file            plugins/ai-core/webapp/utils/tools/execute.js
- * @version         1.0.0
+ * @version         1.0.1
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
