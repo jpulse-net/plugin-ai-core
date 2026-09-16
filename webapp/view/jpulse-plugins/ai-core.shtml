@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+ * @name            jPulse Framework / Plugins / AI Core / WebApp / View / jPulse Plugins / AI Core
+ * @tagline         AI Core plugin overview
+ * @description     Dashboard card and overview for the AI agent server core
+ * @file            plugins/ai-core/webapp/view/jpulse-plugins/ai-core.shtml
+ * @version         1.0.0
+ * @release         2026-09-17
+ * @repository      https://github.com/jpulse-net/plugin-ai-core
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
+ * @genai           80%, Cursor 3.20, Grok 4.6
+-->
+<html {{appConfig.system.htmlAttrs}}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Core Plugin - {{app.site.shortName}}</title>
+    {{file.include "jpulse-header.tmpl"}}
+</head>
+<body>
+    {{#component "pluginCards.aiCore" order=40}}
+        <a href="/jpulse-plugins/ai-core.shtml" class="jp-card-dashboard jp-icon-btn">
+            <div class="jp-icon-container"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></div>
+            <h3 class="jp-card-title">AI Core</h3>
+            <p class="jp-card-description">Agent server core — tools, turns, quota, HTTP</p>
+        </a>
+    {{/component}}
+    <div class="jp-main">
+        <div class="jp-container-1000">
+            <div class="jp-page-header">
+                <h1><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Core Plugin</h1>
+                <span class="jp-subtitle">Agent server core — tools, turns, quota, HTTP</span>
+            </div>
+            <p>A site registers scope and tools through hooks. This plugin runs turns, enforces authorization and quota, and streams replies over HTTP.</p>
+            <ul>
+                <li><a href="/admin/config.shtml">Site Configuration → AI</a></li>
+                <li><a href="/admin/ai-usage.shtml">AI usage</a></li>
+                <li><a href="/admin/plugin-config.shtml?plugin=ai-core">Debug dumps (plugin config)</a></li>
+                <li><a href="/jpulse-plugins/ai-mock.shtml">AI Mock</a></li>
+                <li><a href="/jpulse-docs/installed-plugins/ai-core/README">AI Core guide</a></li>
+            </ul>
+        </div>
+    </div>
+    {{file.include "jpulse-footer.tmpl"}}
+</body>
+</html>

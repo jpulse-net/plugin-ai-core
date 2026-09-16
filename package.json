@@ -1,0 +1,24 @@
+{
+    "name": "@jpulse-net/plugin-ai",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "jPulse AI agent bundle: ai-core plus the ai-mock provider",
+    "keywords": ["jpulse", "jpulse-plugin", "ai", "agent"],
+    "author": "jPulse Team <team@jpulse.net>",
+    "license": "BSL-1.1",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jpulse-net/plugin-ai-core.git"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "public"
+    },
+    "files": [
+        "plugins"
+    ],
+    "scripts": {
+        "prepack": "node ../../bin/jpulse-framework.js plugin stage-bundle",
+        "postpack": "node ../../bin/jpulse-framework.js plugin unstage-bundle"
+    }
+}

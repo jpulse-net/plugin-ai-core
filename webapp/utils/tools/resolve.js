@@ -1,0 +1,87 @@
+/**
+ * @name            jPulse Framework / Plugins / AI Core / WebApp / Tools / Resolve
+ * @tagline         The one offered-tool-list function
+ * @description     Recomputed every round; used by the loop, the probe, and later MCP
+ * @file            plugins/ai-core/webapp/utils/tools/resolve.js
+ * @version         1.0.0
+ * @release         2026-09-17
+ * @repository      https://github.com/jpulse-net/plugin-ai-core
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
+ * @genai           80%, Cursor 3.20, Grok 4.6
+ */
+
+import { normalizeActor } from './actor.js';
+import { publicTool } from './descriptor.js';
+import { authorizeTool } from './gates.js';
+import { collectTools } from './registry.js';
+
+/**
+ * Resolve scope via onAiScopeResolve. Handlers mutate ctx.scope in place
+ * (executeFirst still sees the mutation even when they return undefined).
+ * @param {object} actor
+ * @param {object} [hookManager]
+ * @returns {Promise<object>}
+ */
+export async function resolveScope(actor, hookManager) {
+    const normalized = normalizeActor(actor);
+    const ctx = {
+        actor: normalized,
+        scopeId: normalized.scopeId,
+        scopeType: normalized.scopeType,
+        scope: {
+            label: '',
+            canRead: false,
+            canWrite: false,
+            nouns: { item: 'item', container: 'scope' }
+        }
+    };
+    if (hookManager && typeof hookManager.executeFirst === 'function') {
+        await hookManager.executeFirst('onAiScopeResolve', ctx);
+    }
+    return ctx.scope || {};
+}
+
+/**
+ * The single answer to "which tools does this actor get".
+ * Client-host tools stay on the list for web/ws/api (withheld at execute until
+ * W-225) and are filtered for origin mcp. exposeToMcp === false is also dropped
+ * for mcp.
+ * @param {object} actor
+ * @param {object} [options]
+ * @returns {Promise<{ actor, scope, tools, withheld, policy }>}
+ */
+export async function resolveTools(actor, options = {}) {
+    const normalized = normalizeActor(actor);
+    const hookManager = options.hookManager || global.HookManager;
+    const policy = options.policy || { reviewedToolNames: [], disabledToolNames: [] };
+    const registered = options.tools || await collectTools(hookManager, { actor: normalized });
+    const scope = options.scope || await resolveScope(normalized, hookManager);
+
+    const offered = [];
+    const withheld = [];
+    for (const tool of registered) {
+        if (normalized.origin === 'mcp' && (tool.host === 'client' || tool.exposeToMcp === false)) {
+            withheld.push({ name: tool.name, reason: 'mcp' });
+            continue;
+        }
+        const denied = authorizeTool(tool, normalized, scope, policy);
+        if (denied) {
+            withheld.push({ name: tool.name, reason: denied.code, error: denied.error });
+            continue;
+        }
+        offered.push(tool);
+    }
+
+    return {
+        actor: normalized,
+        scope,
+        tools: offered,
+        withheld,
+        policy,
+        publicTools: offered.map(publicTool)
+    };
+}
+
+// EOF plugins/ai-core/webapp/utils/tools/resolve.js

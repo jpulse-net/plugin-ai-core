@@ -1,0 +1,35 @@
+{
+    "name": "ai-core",
+    "npmPackage": "@jpulse-net/plugin-ai",
+    "version": "1.0.0",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2\"/><path d=\"M20 14h2\"/><path d=\"M15 13v2\"/><path d=\"M9 13v2\"/></svg>",
+    "summary": "AI agent server core: tools, turns, quota, and a mock-ready provider contract",
+    "description": "<p>Gives a jPulse site an AI agent by configuration rather than by building one. A site registers scope and tools through hooks; the plugin runs turns, enforces authorization and quota, and streams replies over HTTP.</p><ul><li><strong>Tools layer:</strong> named capabilities, four authorization gates, declarative per-turn budgets</li><li><strong>Agent layer:</strong> turn loop, provider contract, prompt assembly, reserve-then-settle quota</li><li><strong>HTTP/SSE:</strong> complete turns over plain HTTP for controller-centric sites</li></ul><p>Installs together with <code>ai-mock</code> as <code>@jpulse-net/plugin-ai</code>. A commercial provider is a separate package.</p>",
+    "author": "jPulse Team <team@jpulse.net>",
+    "jpulseVersion": ">=2.0.2",
+    "autoEnable": true,
+    "bundle": {
+        "members": ["ai-mock"]
+    },
+    "dependencies": {
+        "npm": {},
+        "plugins": {}
+    },
+    "config": {
+        "schema": [
+            {
+                "type": "help",
+                "content": "<p>This page is for plugin-local diagnostics that should not sit on the AI tab (they are easy to leave on).</p><ul><li><a href=\"/admin/config.shtml\">Site Configuration</a> → AI — master switch, roles, models, quota, loop limits</li><li><a href=\"/admin/ai-usage.shtml\">AI usage</a> — requests, tokens, and cost by subject and period</li><li><a href=\"/jpulse-docs/installed-plugins/ai-core/README\">AI Core guide</a></li><li><a href=\"/admin/plugins.shtml\">Plugin management</a></li></ul>",
+                "tab": "General"
+            },
+            {
+                "id": "debugDumps",
+                "label": "Write debug dumps",
+                "type": "boolean",
+                "default": false,
+                "help": "Log assembled prompts and tool results. Off by default. Do not leave this on in production.",
+                "tab": "General"
+            }
+        ]
+    }
+}

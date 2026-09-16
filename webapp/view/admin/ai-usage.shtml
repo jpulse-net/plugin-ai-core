@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!--
+ * @name            jPulse Framework / Plugins / AI Core / WebApp / View / Admin / AI Usage
+ * @tagline         AI usage by subject and period
+ * @description     Per-subject requests, tokens, and cost with over-quota and costUnknown flags
+ * @file            plugins/ai-core/webapp/view/admin/ai-usage.shtml
+ * @version         1.0.0
+ * @release         2026-09-17
+ * @repository      https://github.com/jpulse-net/plugin-ai-core
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
+ * @genai           80%, Cursor 3.20, Grok 4.6
+-->
+<html {{appConfig.system.htmlAttrs}}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{i18n.view.ui.ai.usage.title}} - {{app.site.shortName}}</title>
+    {{file.include "jpulse-header.tmpl"}}
+</head>
+<body>
+    {{#component "adminCards.aiUsage" order=80}}
+        <a href="/admin/ai-usage.shtml" class="jp-card-dashboard jp-icon-btn">
+            <div class="jp-icon-container"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></div>
+            <h3 class="jp-card-title">{{i18n.view.ui.ai.usage.heading}}</h3>
+            <p class="jp-card-description">{{i18n.view.ui.ai.usage.intro}}</p>
+        </a>
+    {{/component}}
+    <div class="jp-main">
+        <h1>{{i18n.view.ui.ai.usage.heading}}</h1>
+        <p>{{i18n.view.ui.ai.usage.intro}}</p>
+        <div id="ai-usage-status" class="jp-muted"></div>
+        <div class="jp-table-wrap">
+            <table class="jp-table" id="ai-usage-table">
+                <thead>
+                    <tr>
+                        <th>{{i18n.view.ui.ai.usage.subject}}</th>
+                        <th>{{i18n.view.ui.ai.usage.period}}</th>
+                        <th>{{i18n.view.ui.ai.usage.requests}}</th>
+                        <th>{{i18n.view.ui.ai.usage.tokens}}</th>
+                        <th>{{i18n.view.ui.ai.usage.cost}}</th>
+                        <th>{{i18n.view.ui.ai.usage.flags}}</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    {{file.include "jpulse-footer.tmpl"}}
+    <script>
+        jPulse.dom.ready(async function () {
+            const status = document.getElementById('ai-usage-status');
+            const body = document.querySelector('#ai-usage-table tbody');
+            try {
+                const result = await jPulse.api.get('/api/1/ai/usage');
+                const rows = result.data || [];
+                if (!rows.length) {
+                    status.textContent = '{{i18n.view.ui.ai.usage.empty}}';
+                    return;
+                }
+                status.textContent = '';
+                for (const row of rows) {
+                    const tr = document.createElement('tr');
+                    const flags = [];
+                    if (row.costUnknown) {
+                        flags.push('{{i18n.view.ui.ai.usage.costUnknown}}');
+                    }
+                    if (row.overQuota) {
+                        flags.push('{{i18n.view.ui.ai.usage.overQuota}}');
+                    }
+                    tr.innerHTML =
+                        '<td></td><td></td><td></td><td></td><td></td><td></td>';
+                    const cells = tr.querySelectorAll('td');
+                    cells[0].textContent = row.subject || '';
+                    cells[1].textContent = row.periodKey || '';
+                    cells[2].textContent = String(row.requests || 0);
+                    cells[3].textContent = String(row.tokens || 0);
+                    cells[4].textContent = row.costUnknown ? '—' : String(row.cost || 0);
+                    cells[5].textContent = flags.join(', ');
+                    body.appendChild(tr);
+                }
+            } catch (error) {
+                status.textContent = error.message || '{{i18n.view.ui.ai.usage.loadError}}';
+            }
+        });
+    </script>
+</body>
+</html>
