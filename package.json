@@ -1,5 +1,5 @@
 {
-    "name": "@jpulse-net/plugin-ai",
+    "name": "@jpulse-net/plugin-ai-core",
     "version": "1.0.0",
     "type": "module",
     "description": "jPulse AI agent bundle: ai-core plus the ai-mock provider",

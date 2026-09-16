@@ -7,7 +7,7 @@ A jPulse site gets an agent by configuring one rather than building one. This pa
 Install (both members auto-enable), then pick settings on Site Configuration → AI:
 
 ```
-npx jpulse plugin install @jpulse-net/plugin-ai
+npx jpulse plugin install @jpulse-net/plugin-ai-core
 ```
 
 One site controller — this is the entire server side:
