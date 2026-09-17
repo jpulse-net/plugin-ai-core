@@ -3,7 +3,7 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -88,11 +88,16 @@
 }
 
 .plg-ai-user {
-    margin: 0 0 8px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--jp-theme-bg-secondary);
+    width: fit-content;
+    max-width: calc(100% - 36px);
+    margin: 0 0 10px auto;
+    padding: 8px 14px 8px 16px;
+    border-radius: 18px;
+    background: var(--jp-theme-bg-tertiary);
     color: var(--jp-theme-text-primary);
+    box-shadow: inset 4px 0 0 var(--jp-theme-color-primary);
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
 }
 
 .plg-ai-agent {
@@ -165,6 +170,15 @@
     white-space: pre-wrap;
 }
 
+.plg-ai-plain code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    padding: 0.05em 0.3em;
+    border-radius: 4px;
+    background: var(--jp-theme-bg-secondary);
+    color: var(--jp-theme-text-primary);
+}
+
 .plg-ai-dots {
     display: inline-flex;
     align-items: flex-end;
@@ -187,6 +201,48 @@
 
 .plg-ai-dots span:nth-child(3) {
     animation-delay: 0.3s;
+}
+
+.plg-ai-card {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 8px;
+    background: var(--jp-theme-bg-secondary);
+}
+
+.plg-ai-card-kind {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--jp-theme-text-secondary);
+    margin-bottom: 6px;
+}
+
+.plg-ai-card-preview {
+    white-space: pre-wrap;
+    margin-bottom: 8px;
+    color: var(--jp-theme-text-primary);
+}
+
+.plg-ai-card-actions,
+.plg-ai-card-all {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.plg-ai-card-status,
+.plg-ai-guard {
+    font-size: 0.85em;
+    color: var(--jp-theme-text-secondary);
+}
+
+.plg-ai-guard {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--jp-theme-border-color);
 }
 
 @keyframes plg-ai-dot-jump {

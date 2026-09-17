@@ -3,7 +3,7 @@
  * @tagline         Transport layer public surface
  * @description     HTTP/SSE for controller-centric turns; WebSocket for client-host tools
  * @file            plugins/ai-core/webapp/utils/transport/index.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

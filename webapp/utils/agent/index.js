@@ -3,7 +3,7 @@
  * @tagline         Agent layer public surface
  * @description     Turn loop, quota, lease, prompt, providers — no transport imports
  * @file            plugins/ai-core/webapp/utils/agent/index.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -38,7 +38,14 @@ export {
     quotaSnapshot,
     usageDocumentKey
 } from './quota.js';
-export { AI_CONFIG_DEFAULTS, loadSettings, mergeSettings, roleAllowed } from './settings.js';
+export {
+    AI_CONFIG_DEFAULTS,
+    cacheSettings,
+    getCachedSettings,
+    loadSettings,
+    mergeSettings,
+    roleAllowed
+} from './settings.js';
 export { deriveThreadLabel, runTurn } from './turnLoop.js';
 
 // EOF plugins/ai-core/webapp/utils/agent/index.js

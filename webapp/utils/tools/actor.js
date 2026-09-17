@@ -3,7 +3,7 @@
  * @tagline         Actor context and named capabilities
  * @description     Normalize who is acting and resolve named capabilities for a scope
  * @file            plugins/ai-core/webapp/utils/tools/actor.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

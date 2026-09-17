@@ -3,7 +3,7 @@
  * @tagline         Provider registry and capability map
  * @description     capabilities is a map; unknown keys read false
  * @file            plugins/ai-core/webapp/utils/agent/providers.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

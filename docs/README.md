@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.2
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.3
 
 A jPulse site gets an agent by configuring one rather than building one.
 
@@ -77,6 +77,7 @@ Everything but `name`, `description`, and `schema` has a default.
 | `dataScope` | `call` | `call` or `turn`; only with `module` |
 | `requires` | `null` | Named capability, e.g. `scope:read` |
 | `mutates` | `false` | A flag. Direct writes are not propose/apply |
+| `proposes` | `false` | This call creates an Apply card. The call itself writes nothing |
 | `timeoutMs` | `5000` | |
 | `group` | `read` | Admin policy grouping |
 | `budget` | `null` | `{ key, max, countWhen, overMessage, overHint }` |
@@ -107,12 +108,17 @@ jPulse.ai.panel.create({
         describeScope() { … },
         describeContext() { … },
         describeTarget() { … },
-        executeTool(name, args) { … }
+        executeTool(name, args) { … },
+        renderProposalPreview(proposal) { … },
+        applyProposal(proposal) { … },
+        undoProposal(proposal) { … }
     }
 });
 ```
 
-`adapter` may be omitted. `toolData` plus the three `describe*` methods are enough for a read-only agent. `executeTool` is the exception, not the interface.
+`adapter` may be omitted. `toolData` plus the three `describe*` methods are enough for a read-only agent. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`.
+
+`renderProposalPreview` may return a DOM node, or a string that the panel escapes as text. `applyProposal` and `undoProposal` perform the site's real write and resolve truthy on success. The panel records the outcome after the adapter resolves, so a failed write never marks a card applied.
 
 ## Slash commands
 
@@ -130,6 +136,32 @@ Typing `/` opens the picker. Enter runs the highlighted command and posts it int
 
 The model is not in the panel header. `/model` is how you view and set it. Conversation title, switch, rename, and new conversation sit on one row under the title.
 
+## Propose and apply
+
+A proposing tool does not write. It returns a proposal; the user applies it.
+
+```js
+{
+    name:     'propose_draft_rewrite',
+    host:     'client',
+    module:   'proposeRewrite',
+    requires: 'scope:write',
+    proposes: true,
+    dedupeArgs: true,
+    budget:   { key: 'proposals', max: 3, overMessage: 'This turn already made %MAX% proposals.' }
+}
+```
+
+A successful result carries `data.proposal = { kind, payload, preview }`. `kind` is a label. `payload` is whatever the site needs at apply time and is never interpreted by the plugin. The plugin mints the card id from the turn id and the tool-call id.
+
+`POST /api/1/ai/turn/:id/applied` and `/undone` record that the user applied or undid a card. They check turn ownership and are idempotent. They do not authorize the write — that lives on the site's own authenticated API, which `adapter.applyProposal` calls. Put an idempotency token on that site call if the write needs one.
+
+Cap and duplicate refusal are declarations on the tool (`budget` and `dedupeArgs`), not a separate setting. Several proposing calls in one turn each get their own card; every pending card stays applyable (Apply all runs them in order).
+
+The false-claim guard is a phrase list on Site Configuration → AI. Each line is a plain phrase or `/regex/flags`. A reply that matches, in a turn that offered a proposing tool and created no card, gets a note in the panel and a history note on the next prompt. Stored reply text is never rewritten. A read-only agent that registers no proposing tool never sees a record, a card, or a note.
+
+Use a direct `mutates: true` write when the user is looking at the change and can undo it by hand. Use propose/apply when the change needs consent first.
+
 ## Hello AI
 
 `/hello-ai/` is a scratch pad. It never reaches the server. User-facing copy uses that one name, not draft or summary.
@@ -137,10 +169,11 @@ The model is not in the panel header. `/model` is how you view and set it. Conve
 | Tool | Host | Path |
 |---|---|---|
 | `read_draft` | client | module `readDraft` |
+| `propose_draft_rewrite` | client | module `proposeRewrite`, `proposes: true`, 3 proposals per turn |
 | `append_draft` | client | `adapter.executeTool`, `mutates: true`, 3 writes per turn |
 | `get_hello_clock` | server | `onAiToolExecute` |
 
-`append_draft` writes immediately. That is not propose/apply — there is no Apply card. Propose/apply is a later, opt-in pattern.
+`append_draft` writes immediately. There is no Apply card; the undo is the textarea in front of you. `propose_draft_rewrite` is the other shape: it is a pure module, it writes nothing, and Apply / Undo sit on the card.
 
 Those tools register only when `scopeType` is `hello-ai`. Installing the bundle does not force a WebSocket on every other page.
 
@@ -148,8 +181,8 @@ Type the examples from `/help` in the panel. For `curl`, prefix `[mock:tool:<nam
 
 ## Still absent
 
-Attachments, URL ingest, and vision; Apply cards and the false-claim guard.
+Attachments, URL ingest, and vision.
 
 ## Admin
 
-Site Configuration → AI holds the master switch, roles, models, quota, loop limits, tool policy, retention, auto-title, and site instructions. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.
+Site Configuration → AI holds the master switch, roles, models, quota, loop limits, tool policy, retention, auto-title, site instructions, and the false-claim phrase list. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.

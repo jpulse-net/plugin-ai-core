@@ -1,6 +1,6 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.2
+# jPulse Framework / Plugins / AI Core Plugin v1.0.3
 
-AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, and `jPulse.ai.panel`. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
+AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
 
 Requires jPulse Framework >= 2.0.3 (awaitable WebSocket `onCreate`).
 
@@ -80,6 +80,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.3: Propose and apply — proposal records on the turn, Apply cards, apply/undo endpoints, and a site-configured false-claim guard. `hello-ai` adds `propose_draft_rewrite` beside the direct write.
 - 1.0.2: Chat panel (`jPulse.ai.panel`), client-host tools over a per-thread WebSocket, shared `utils/ai-tools/` modules, and the `/hello-ai/` scratch-pad demo. Requires framework >= 2.0.3.
 - 1.0.1: Model-selection surface — omit a provider with `configured: false`, persist the thread pair, accept `provider`/`model` on `PUT /api/1/ai/thread/:id`, grey non-vision rows when `?hasImages=1`, provider-only site default, and the live capability probe on `/jpulse-plugins/ai-core.shtml`.
 - 1.0.0: First release: tools layer, agent layer, mock-ready provider contract, HTTP/SSE, admin AI tab, usage page.

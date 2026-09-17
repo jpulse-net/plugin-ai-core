@@ -3,7 +3,7 @@
  * @tagline         Admin and plugin navigation for AI Core
  * @description     Appends AI usage to the admin menu and AI Core to jPulse Plugins
  * @file            plugins/ai-core/webapp/view/jpulse-navigation.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

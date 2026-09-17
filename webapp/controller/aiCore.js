@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -44,6 +44,13 @@ import {
     threadOwner
 } from '../utils/tools/index.js';
 import { chooseTransport, openSseTurn, registerAiNamespace } from '../utils/transport/index.js';
+import {
+    applyProposalRecord,
+    DEFAULT_CLAIM_PHRASES,
+    persistTurnProposals,
+    proposalsFromTurn,
+    undoProposalRecord
+} from '../utils/proposals/index.js';
 
 const LogController = global.LogController;
 const CommonUtils = global.CommonUtils;
@@ -164,11 +171,25 @@ class AiCoreController {
 
     static hooks = {
         onAiQuotaCheck: { handler: 'onAiQuotaCheck', priority: 1000 },
-        onAiQuotaSettle: { handler: 'onAiQuotaSettle', priority: 1000 }
+        onAiQuotaSettle: { handler: 'onAiQuotaSettle', priority: 1000 },
+        onAiTurnAfter: { handler: 'onAiTurnAfter', priority: 1000 }
     };
 
     static onAiQuotaCheck = onAiQuotaCheck;
     static onAiQuotaSettle = onAiQuotaSettle;
+
+    static async onAiTurnAfter(ctx) {
+        const settings = await loadSettings();
+        await persistTurnProposals(ctx, {
+            turnModel: AiTurnModel,
+            phrases: settings.proposalClaimPhrases,
+            async wasOffered() {
+                const resolved = await resolveTools(ctx.actor, { policy: settings.policy });
+                return (resolved.tools || []).some(tool => tool.proposes);
+            }
+        });
+        return ctx;
+    }
 
     static routes = [
         { method: 'GET', path: '/api/1/ai/capability', handler: 'apiCapability', auth: 'user' },
@@ -181,6 +202,8 @@ class AiCoreController {
         { method: 'GET', path: '/api/1/ai/thread/:id/turns', handler: 'apiListTurns', auth: 'user' },
         { method: 'POST', path: '/api/1/ai/thread/:id/turn', handler: 'apiStartTurn', auth: 'user' },
         { method: 'POST', path: '/api/1/ai/thread/:id/cancel', handler: 'apiCancelTurn', auth: 'user' },
+        { method: 'POST', path: '/api/1/ai/turn/:id/applied', handler: 'apiTurnApplied', auth: 'user' },
+        { method: 'POST', path: '/api/1/ai/turn/:id/undone', handler: 'apiTurnUndone', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/usage', handler: 'apiUsage', auth: 'admin' }
     ];
 
@@ -289,6 +312,16 @@ class AiCoreController {
                         fullWidth: true,
                         startNewRow: true,
                         label: '{{i18n.view.ui.ai.config.siteInstructions}}'
+                    },
+                    proposalClaimPhrases: {
+                        type: 'string',
+                        default: DEFAULT_CLAIM_PHRASES.join('\n'),
+                        inputType: 'textarea',
+                        rows: 8,
+                        fullWidth: true,
+                        startNewRow: true,
+                        label: '{{i18n.view.ui.ai.config.proposalClaimPhrases}}',
+                        help: '{{i18n.view.ui.ai.config.proposalClaimPhrasesHelp}}'
                     }
                 }
             });
@@ -362,6 +395,17 @@ class AiCoreController {
         return thread;
     }
 
+    static async _ownedTurn(req, actor, id) {
+        const turn = await AiTurnModel.findById(id);
+        if (!turn) {
+            return null;
+        }
+        if (turn.createdBy !== threadOwner(actor)) {
+            return false;
+        }
+        return turn;
+    }
+
     static async apiCapability(req, res) {
         const start = Date.now();
         try {
@@ -388,6 +432,7 @@ class AiCoreController {
                     defaultModel: pickDefaultModel(menu, settings),
                     quota,
                     retentionDays: settings.retentionDays,
+                    proposalClaimPhrases: settings.proposalClaimPhrases,
                     scope: resolved.scope
                 }
             });
@@ -591,7 +636,10 @@ class AiCoreController {
             if (thread === false) {
                 return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
             }
-            const turns = await AiTurnModel.listByThread(thread._id);
+            const turns = (await AiTurnModel.listByThread(thread._id)).map((turn) => ({
+                ...turn,
+                proposals: proposalsFromTurn(turn)
+            }));
             res.json({ success: true, data: turns });
             logOk(req, 'aiCore.apiListTurns', actor, `${turns.length} turns`);
         } catch (error) {
@@ -682,6 +730,62 @@ class AiCoreController {
         } catch (error) {
             logErr(req, 'aiCore.apiCancelTurn', actorFromRequest(req), error);
             return sendError(req, res, 500, 'Failed to cancel turn', 'AI_CANCEL_FAILED');
+        }
+    }
+
+    static async apiTurnApplied(req, res) {
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiTurnApplied', actor);
+            const turn = await this._ownedTurn(req, actor, req.params.id);
+            if (turn == null) {
+                return sendError(req, res, 404, 'Turn not found', 'AI_TURN_NOT_FOUND');
+            }
+            if (turn === false) {
+                return sendError(req, res, 403, 'Not your turn', 'AI_TURN_FORBIDDEN');
+            }
+            const proposalId = typeof req.body?.proposalId === 'string' ? req.body.proposalId.trim() : '';
+            const marked = await applyProposalRecord(AiTurnModel, turn, proposalId);
+            if (!marked.ok) {
+                return sendError(req, res, 404, 'Proposal not found', marked.code || 'AI_PROPOSAL_NOT_FOUND');
+            }
+            res.json({ success: true, data: marked.turn });
+            logOk(req, 'aiCore.apiTurnApplied', actor, String(turn._id));
+        } catch (error) {
+            logErr(req, 'aiCore.apiTurnApplied', actorFromRequest(req), error);
+            return sendError(req, res, 500, 'Failed to mark proposal applied', 'AI_TURN_APPLIED');
+        }
+    }
+
+    static async apiTurnUndone(req, res) {
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiTurnUndone', actor);
+            const turn = await this._ownedTurn(req, actor, req.params.id);
+            if (turn == null) {
+                return sendError(req, res, 404, 'Turn not found', 'AI_TURN_NOT_FOUND');
+            }
+            if (turn === false) {
+                return sendError(req, res, 403, 'Not your turn', 'AI_TURN_FORBIDDEN');
+            }
+            const proposalId = typeof req.body?.proposalId === 'string' ? req.body.proposalId.trim() : '';
+            const marked = await undoProposalRecord(AiTurnModel, turn, proposalId);
+            if (!marked.ok) {
+                return sendError(req, res, 404, 'Proposal not found', marked.code || 'AI_PROPOSAL_NOT_FOUND');
+            }
+            res.json({ success: true, data: marked.turn });
+            logOk(req, 'aiCore.apiTurnUndone', actor, String(turn._id));
+        } catch (error) {
+            logErr(req, 'aiCore.apiTurnUndone', actorFromRequest(req), error);
+            return sendError(req, res, 500, 'Failed to mark proposal undone', 'AI_TURN_UNDONE');
         }
     }
 

@@ -3,7 +3,7 @@
  * @tagline         Turn records
  * @description     One user message and everything the agent did in response
  * @file            plugins/ai-core/webapp/model/aiTurn.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -69,6 +69,7 @@ class AiTurnModel {
             userText: params.userText || '',
             agentText: '',
             toolCalls: [],
+            proposals: [],
             events: [],
             usage: emptyUsage(),
             cost: null,
@@ -104,6 +105,17 @@ class AiTurnModel {
 
     static async finalize(id, fields) {
         return this._update(id, { ...fields, updatedAt: new Date() });
+    }
+
+    static async setProposals(id, list) {
+        return this._update(id, {
+            proposals: Array.isArray(list) ? list : [],
+            updatedAt: new Date()
+        });
+    }
+
+    static async markProposingOffered(id) {
+        return this._update(id, { proposingOffered: true, updatedAt: new Date() });
     }
 
     static async appendEvent(id, event) {

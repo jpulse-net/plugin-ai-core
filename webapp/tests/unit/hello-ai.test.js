@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Isolation, write path, mock sequence, adapter scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -53,6 +53,7 @@ describe('hello-ai isolation', () => {
         await HelloAiController.onAiToolRegister(ctx);
         expect(ctx.tools.map(tool => tool.name)).toEqual([
             'read_draft',
+            'propose_draft_rewrite',
             'append_draft',
             'get_hello_clock'
         ]);
@@ -289,14 +290,20 @@ describe('adapter contract scan', () => {
             describeScope() { return 'scope'; },
             describeContext() { return 'context'; },
             describeTarget() { return 'target'; },
-            executeTool() { return { ok: true }; }
+            executeTool() { return { ok: true }; },
+            renderProposalPreview() { return ''; },
+            applyProposal() { return true; },
+            undoProposal() { return true; }
         };
         expect(Object.keys(stub).sort()).toEqual([
+            'applyProposal',
             'describeContext',
             'describeScope',
             'describeTarget',
             'executeTool',
-            'toolData'
+            'renderProposalPreview',
+            'toolData',
+            'undoProposal'
         ]);
     });
 });

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Modules
  * @tagline         Hashing, purity, dataScope, two-host run
  * @file            plugins/ai-core/webapp/tests/unit/modules.test.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -80,7 +80,9 @@ describe('shared tool modules', () => {
         const pluginDir = path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/ai-tools');
         const scanned = scanToolModules({ roots: [pluginDir] });
         expect(scanned.map(row => row.name)).toContain('readDraft');
+        expect(scanned.map(row => row.name)).toContain('proposeRewrite');
         expect(scanned.find(row => row.name === 'readDraft').ok).toBe(true);
+        expect(scanned.find(row => row.name === 'proposeRewrite').ok).toBe(true);
     });
 
     test('stale hash is not served', () => {

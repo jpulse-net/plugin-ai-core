@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -53,12 +53,52 @@ if (!window.jPulse) {
         slashReason: '{{i18n.view.ui.ai.slash.reason}}',
         slashNone: '{{i18n.view.ui.ai.slash.none}}',
         slashUnknown: '{{i18n.view.ui.ai.slash.unknown}}',
-        slashExamples: '{{i18n.view.ui.ai.slash.examples}}'
+        slashExamples: '{{i18n.view.ui.ai.slash.examples}}',
+        cardApply: '{{i18n.view.ui.ai.card.apply}}',
+        cardUndo: '{{i18n.view.ui.ai.card.undo}}',
+        cardApplyAll: '{{i18n.view.ui.ai.card.applyAll}}',
+        cardApplied: '{{i18n.view.ui.ai.card.applied}}',
+        cardUndone: '{{i18n.view.ui.ai.card.undone}}',
+        cardFailed: '{{i18n.view.ui.ai.card.failed}}',
+        cardGuard: '{{i18n.view.ui.ai.card.guard}}',
+        cardRunning: '{{i18n.view.ui.ai.card.running}}',
+        cardReadOnly: '{{i18n.view.ui.ai.card.readOnly}}'
     };
     const SLASH_COMMANDS = ['help', 'tools', 'model', 'new', 'cancel'];
     const RESULT_SIZE_CAP = 256 * 1024;
     const loadedModules = new Map();
     let markedPromise = null;
+
+    function compileClaimPhrases(list) {
+        const lines = Array.isArray(list) ? list : String(list || '').split(/\n/);
+        const compiled = [];
+        lines.forEach((raw) => {
+            const source = String(raw || '').trim();
+            if (!source) {
+                return;
+            }
+            const match = source.match(/^\/(.+)\/([a-z]*)$/i);
+            if (match) {
+                try {
+                    const regex = new RegExp(match[1], match[2]);
+                    compiled.push((text) => regex.test(text));
+                    return;
+                } catch (_err) {
+                    // literal
+                }
+            }
+            const needle = source.toLowerCase();
+            compiled.push((text) => String(text || '').toLowerCase().indexOf(needle) !== -1);
+        });
+        return compiled;
+    }
+
+    function claimsWithoutCard(text, phrases) {
+        if (!text) {
+            return false;
+        }
+        return compileClaimPhrases(phrases).some((test) => test(text));
+    }
 
     function escapeHtml(value) {
         return jPulse.string && jPulse.string.escapeHtml
@@ -472,13 +512,17 @@ if (!window.jPulse) {
         if (!root.parentNode && document.body) {
             document.body.appendChild(root);
         }
+        let pinMessages = function () {};
         const handle = jPulse.UI.floatPanel.create({
             id: panelId,
             el: root,
             defaults: { w: 420, h: 560, open: !!options.open },
             minWidth: 320,
             minHeight: 360,
-            launcher: options.launcher
+            launcher: options.launcher,
+            onOpen: function () {
+                pinMessages();
+            }
         });
         const launcherEl = typeof options.launcher === 'string'
             ? document.querySelector(options.launcher)
@@ -509,7 +553,8 @@ if (!window.jPulse) {
             selectedProvider: '',
             selectedModel: '',
             slashHighlight: 0,
-            renaming: false
+            renaming: false,
+            cardBusy: {}
         };
 
         const els = {
@@ -523,6 +568,21 @@ if (!window.jPulse) {
             threadEdit: root.querySelector('.plg-ai-thread-edit'),
             rename: root.querySelector('.plg-ai-rename'),
             newer: root.querySelector('.plg-ai-new')
+        };
+
+        function scrollMessagesToEnd() {
+            if (!els.messages) {
+                return;
+            }
+            els.messages.scrollTop = els.messages.scrollHeight;
+        }
+
+        pinMessages = function () {
+            scrollMessagesToEnd();
+            requestAnimationFrame(function () {
+                scrollMessagesToEnd();
+                requestAnimationFrame(scrollMessagesToEnd);
+            });
         };
 
         function showNotice(text, visible) {
@@ -590,7 +650,8 @@ if (!window.jPulse) {
         }
 
         function renderPlain(text) {
-            return `<div class="plg-ai-plain">${escapeHtml(text || '')}</div>`;
+            const escaped = escapeHtml(text || '').replace(/`([^`\n]+)`/g, '<code>$1</code>');
+            return `<div class="plg-ai-plain">${escaped}</div>`;
         }
 
         function entryTime(value, fallback) {
@@ -599,6 +660,99 @@ if (!window.jPulse) {
             }
             const ms = new Date(value).getTime();
             return Number.isFinite(ms) ? ms : fallback;
+        }
+
+        function proposingOffered() {
+            const tools = (state.capability && state.capability.tools) || [];
+            return tools.some((tool) => tool.proposes);
+        }
+
+        function claimPhrases() {
+            return (state.capability && state.capability.proposalClaimPhrases) || [];
+        }
+
+        function scopeCanWrite() {
+            const scope = state.capability && state.capability.scope;
+            return !scope || scope.canWrite !== false;
+        }
+
+        function cardApplyState(card) {
+            if (!card || card.applied || card.undone) {
+                return { ok: false, reason: 'done' };
+            }
+            if (state.running) {
+                return { ok: false, reason: 'running' };
+            }
+            if (!scopeCanWrite()) {
+                return { ok: false, reason: 'readonly' };
+            }
+            if (state.cardBusy[card.id]) {
+                return { ok: false, reason: 'busy' };
+            }
+            return { ok: true };
+        }
+
+        function renderCardHtml(turn, card) {
+            const applyState = cardApplyState(card);
+            const status = card.error
+                ? escapeHtml(card.error)
+                : card.undone
+                    ? escapeHtml(I18N.cardUndone)
+                    : card.applied
+                        ? escapeHtml(I18N.cardApplied)
+                        : applyState.reason === 'running'
+                            ? escapeHtml(I18N.cardRunning)
+                            : applyState.reason === 'readonly'
+                                ? escapeHtml(I18N.cardReadOnly)
+                                : '';
+            const applyHidden = applyState.ok ? '' : ' hidden';
+            const undoHidden = card.applied && !card.undone && !state.running && scopeCanWrite() ? '' : ' hidden';
+            return [
+                `<section class="plg-ai-card" data-ai-card data-proposal-id="${escapeHtml(card.id)}" data-turn-id="${escapeHtml(String(turn._id))}">`,
+                `  <div class="plg-ai-card-kind">${escapeHtml(card.kind || '')}</div>`,
+                '  <div class="plg-ai-card-preview"></div>',
+                '  <div class="plg-ai-card-actions">',
+                `    <button type="button" class="jp-btn jp-btn-primary jp-btn-sm" data-ai-apply="${escapeHtml(card.id)}"${applyHidden}>${escapeHtml(I18N.cardApply)}</button>`,
+                `    <button type="button" class="jp-btn jp-btn-sm" data-ai-undo="${escapeHtml(card.id)}"${undoHidden}>${escapeHtml(I18N.cardUndo)}</button>`,
+                '  </div>',
+                status ? `  <div class="plg-ai-card-status">${status}</div>` : '',
+                '</section>'
+            ].join('');
+        }
+
+        function hydrateCardPreviews() {
+            els.messages.querySelectorAll('[data-ai-card]').forEach((el) => {
+                const turn = state.turns.find((row) => String(row._id) === el.getAttribute('data-turn-id'));
+                const card = ((turn && turn.proposals) || []).find((row) => row.id === el.getAttribute('data-proposal-id'));
+                const box = el.querySelector('.plg-ai-card-preview');
+                if (!box || !card) {
+                    return;
+                }
+                if (typeof adapter.renderProposalPreview === 'function') {
+                    const out = adapter.renderProposalPreview(card);
+                    if (out && typeof out === 'object' && out.nodeType) {
+                        box.textContent = '';
+                        box.appendChild(out);
+                        return;
+                    }
+                    box.textContent = String(out || card.preview || '');
+                    return;
+                }
+                box.textContent = card.preview || card.kind || '';
+            });
+        }
+
+        function stampProposal(turnId, proposalId, fields) {
+            state.turns.forEach((turn) => {
+                if (String(turn._id) !== String(turnId) || !Array.isArray(turn.proposals)) {
+                    return;
+                }
+                turn.proposals.forEach((row) => {
+                    if (row.id === proposalId) {
+                        Object.assign(row, fields);
+                    }
+                });
+            });
         }
 
         async function renderTurnHtml(turn) {
@@ -615,12 +769,24 @@ if (!window.jPulse) {
                 parts.push('<article class="plg-ai-turn">');
             }
             if (agentText) {
-                parts.push(`<div class="plg-ai-agent">${await renderMarkdown(agentText)}</div></article>`);
+                parts.push(`<div class="plg-ai-agent">${await renderMarkdown(agentText)}</div>`);
             } else if (err) {
-                parts.push(`<div class="plg-ai-agent">${renderPlain(err)}</div></article>`);
-            } else {
-                parts.push('</article>');
+                parts.push(`<div class="plg-ai-agent">${renderPlain(err)}</div>`);
             }
+            const cards = Array.isArray(turn.proposals) ? turn.proposals : [];
+            const pending = cards.filter((card) => cardApplyState(card).ok);
+            if (pending.length >= 2) {
+                parts.push(
+                    `<div class="plg-ai-card-all"><button type="button" class="jp-btn jp-btn-sm" data-ai-apply-all="${escapeHtml(String(turn._id))}">${escapeHtml(I18N.cardApplyAll)}</button></div>`
+                );
+            }
+            cards.forEach((card) => {
+                parts.push(renderCardHtml(turn, card));
+            });
+            if (!cards.length && proposingOffered() && claimsWithoutCard(agentText, claimPhrases())) {
+                parts.push(`<div class="plg-ai-guard">${escapeHtml(I18N.cardGuard)}</div>`);
+            }
+            parts.push('</article>');
             return parts.join('');
         }
 
@@ -678,7 +844,8 @@ if (!window.jPulse) {
             }
             els.messages.innerHTML = html.join('');
             pinCopyButtons(els.messages);
-            els.messages.scrollTop = els.messages.scrollHeight;
+            hydrateCardPreviews();
+            pinMessages();
         }
 
         async function openThread(threadId, options) {
@@ -1028,6 +1195,109 @@ if (!window.jPulse) {
                 showNotice(event.type === 'error' ? (event.message || I18N.error) : '', event.type === 'error');
                 openThread(state.threadId, { keepLocals: true });
             }
+        });
+
+        function findTurnProposal(turnId, proposalId) {
+            const turn = state.turns.find((row) => String(row._id) === String(turnId));
+            const proposal = ((turn && turn.proposals) || []).find((row) => row.id === proposalId);
+            return { turn, proposal };
+        }
+
+        async function runApply(turn, proposal) {
+            if (!turn || !proposal || !cardApplyState(proposal).ok) {
+                return false;
+            }
+            state.cardBusy[proposal.id] = true;
+            try {
+                if (typeof adapter.applyProposal !== 'function') {
+                    stampProposal(turn._id, proposal.id, { error: I18N.cardFailed });
+                    return false;
+                }
+                const result = await adapter.applyProposal(proposal);
+                if (!result) {
+                    stampProposal(turn._id, proposal.id, { error: I18N.cardFailed });
+                    return false;
+                }
+                const res = await jPulse.api.post(`/api/1/ai/turn/${encodeURIComponent(turn._id)}/applied`, {
+                    proposalId: proposal.id
+                });
+                if (!res.success) {
+                    stampProposal(turn._id, proposal.id, { error: res.error || I18N.cardFailed });
+                    return false;
+                }
+                stampProposal(turn._id, proposal.id, { applied: true, undone: false, error: '' });
+                return true;
+            } catch (error) {
+                stampProposal(turn._id, proposal.id, { error: error.message || I18N.cardFailed });
+                return false;
+            } finally {
+                delete state.cardBusy[proposal.id];
+            }
+        }
+
+        async function runUndo(turn, proposal) {
+            if (!turn || !proposal || !proposal.applied || proposal.undone) {
+                return false;
+            }
+            state.cardBusy[proposal.id] = true;
+            try {
+                if (typeof adapter.undoProposal !== 'function') {
+                    stampProposal(turn._id, proposal.id, { error: I18N.cardFailed });
+                    return false;
+                }
+                const result = await adapter.undoProposal(proposal);
+                if (!result) {
+                    stampProposal(turn._id, proposal.id, { error: I18N.cardFailed });
+                    return false;
+                }
+                const res = await jPulse.api.post(`/api/1/ai/turn/${encodeURIComponent(turn._id)}/undone`, {
+                    proposalId: proposal.id
+                });
+                if (!res.success) {
+                    stampProposal(turn._id, proposal.id, { error: res.error || I18N.cardFailed });
+                    return false;
+                }
+                stampProposal(turn._id, proposal.id, { undone: true, error: '' });
+                return true;
+            } catch (error) {
+                stampProposal(turn._id, proposal.id, { error: error.message || I18N.cardFailed });
+                return false;
+            } finally {
+                delete state.cardBusy[proposal.id];
+            }
+        }
+
+        els.messages.addEventListener('click', async (event) => {
+            const applyAll = event.target.closest('[data-ai-apply-all]');
+            const applyBtn = event.target.closest('[data-ai-apply]');
+            const undoBtn = event.target.closest('[data-ai-undo]');
+            if (!applyAll && !applyBtn && !undoBtn) {
+                return;
+            }
+            event.preventDefault();
+            if (applyAll) {
+                const turn = state.turns.find((row) => String(row._id) === applyAll.getAttribute('data-ai-apply-all'));
+                const pending = ((turn && turn.proposals) || []).filter((card) => cardApplyState(card).ok);
+                for (const proposal of pending) {
+                    const ok = await runApply(turn, proposal);
+                    if (!ok) {
+                        break;
+                    }
+                }
+                await renderTurns();
+                return;
+            }
+            const cardEl = event.target.closest('[data-ai-card]');
+            if (!cardEl) {
+                return;
+            }
+            const found = findTurnProposal(cardEl.getAttribute('data-turn-id'), cardEl.getAttribute('data-proposal-id'));
+            if (applyBtn) {
+                await runApply(found.turn, found.proposal);
+            } else if (undoBtn) {
+                await runUndo(found.turn, found.proposal);
+            }
+            await renderTurns();
         });
 
         els.send.addEventListener('click', async () => {

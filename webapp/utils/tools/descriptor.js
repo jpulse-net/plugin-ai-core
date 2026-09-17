@@ -3,7 +3,7 @@
  * @tagline         Tool descriptor defaults and owner stamp
  * @description     Normalize a tool registration; owner is stamped, never supplied
  * @file            plugins/ai-core/webapp/utils/tools/descriptor.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -40,6 +40,7 @@ export function normalizeDescriptor(raw, owner) {
         dataScope,
         requires: raw.requires == null || raw.requires === '' ? null : String(raw.requires),
         mutates: raw.mutates === true,
+        proposes: raw.proposes === true,
         timeoutMs: Number.isFinite(raw.timeoutMs) ? raw.timeoutMs : 5000,
         group: typeof raw.group === 'string' && raw.group ? raw.group : 'read',
         budget: normalizeBudget(raw.budget),
@@ -79,6 +80,7 @@ export function publicTool(tool) {
         host: tool.host,
         requires: tool.requires,
         mutates: tool.mutates,
+        proposes: tool.proposes,
         group: tool.group,
         owner: tool.owner
     };

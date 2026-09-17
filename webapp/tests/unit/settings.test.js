@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,12 +14,13 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
-import { loadSettings, mergeSettings } from '../../utils/agent/settings.js';
+import { cacheSettings, loadSettings, mergeSettings } from '../../utils/agent/settings.js';
 
 afterEach(() => {
     delete global.PluginModel;
     delete global.ConfigModel;
     delete global.appConfig;
+    cacheSettings(null);
 });
 
 describe('settings', () => {
@@ -30,6 +31,16 @@ describe('settings', () => {
             '../../../../../webapp/model/plugin.js'
         );
         expect(fs.existsSync(dest)).toBe(true);
+    });
+
+    test('proposalClaimPhrases default to the shipped list and accept a textarea', () => {
+        const defaults = mergeSettings({ site: { enabled: true } });
+        expect(defaults.proposalClaimPhrases.length).toBeGreaterThan(0);
+        expect(defaults.proposalClaimPhrases).toContain('click Apply');
+        const custom = mergeSettings({
+            site: { proposalClaimPhrases: 'Ready for review\n/please apply/i' }
+        });
+        expect(custom.proposalClaimPhrases).toEqual(['Ready for review', '/please apply/i']);
     });
 
     test('debugDumps stays off without plugin or app.conf flag', () => {

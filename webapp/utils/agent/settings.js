@@ -3,7 +3,7 @@
  * @tagline         Effective AI settings
  * @description     Site config tab, optional app.conf.ai, and plugin debug flag
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,7 +12,10 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
+import { DEFAULT_CLAIM_PHRASES } from '../proposals/index.js';
 import { DEFAULT_CAPS } from './quota.js';
+
+let cachedSettings = null;
 
 export const AI_CONFIG_DEFAULTS = {
     enabled: true,
@@ -29,7 +32,8 @@ export const AI_CONFIG_DEFAULTS = {
     reviewedTools: [],
     retentionDays: 90,
     autoTitle: true,
-    siteInstructions: ''
+    siteInstructions: '',
+    proposalClaimPhrases: DEFAULT_CLAIM_PHRASES.slice()
 };
 
 function asArray(value) {
@@ -45,6 +49,25 @@ function asArray(value) {
         }
     }
     return [];
+}
+
+function asLines(value) {
+    if (Array.isArray(value)) {
+        return value.map(row => String(row || '').trim()).filter(Boolean);
+    }
+    if (typeof value === 'string' && value.trim()) {
+        return value.split(/\n/).map(row => row.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+export function cacheSettings(settings) {
+    cachedSettings = settings || null;
+    return cachedSettings;
+}
+
+export function getCachedSettings() {
+    return cachedSettings;
 }
 
 /**
@@ -97,7 +120,10 @@ export function mergeSettings(sources = {}) {
         debugDumps: plugin.debugDumps === true || app.debugDumps === true,
         maxSourceReadsPerTurn: Number.isFinite(site.maxSourceReadsPerTurn)
             ? site.maxSourceReadsPerTurn
-            : 8
+            : 8,
+        proposalClaimPhrases: asLines(site.proposalClaimPhrases).length
+            ? asLines(site.proposalClaimPhrases)
+            : DEFAULT_CLAIM_PHRASES.slice()
     };
 }
 
@@ -143,11 +169,12 @@ export async function loadSettings(deps = {}) {
     } catch {
         plugin = {};
     }
-    return mergeSettings({
+    const merged = mergeSettings({
         site,
         app: deps.app || global.appConfig?.ai || {},
         plugin
     });
+    return cacheSettings(merged);
 }
 
 export function roleAllowed(actor, settings) {

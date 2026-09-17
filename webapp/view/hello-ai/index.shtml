@@ -4,7 +4,7 @@
  * @tagline         hello-ai scratch-pad demo
  * @description     Floating chat panel over browser-only draft state
  * @file            plugins/ai-core/webapp/view/hello-ai/index.shtml
- * @version         1.0.2
+ * @version         1.0.3
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -56,8 +56,8 @@
             <p>
                 This page is a demo of the AI chat panel. Edit the scratch pad below —
                 that text never leaves this tab — then open the chat and ask the agent
-                to read it, add to it, or tell you the server time. In the panel,
-                type <code>/help</code> for example prompts.
+                to read it, append to it, propose a rewrite (Apply card), or tell you
+                the server time. In the panel, type <code>/help</code> for example prompts.
             </p>
             <p>
                 <button type="button" id="hello-ai-launch" class="jp-btn jp-btn-primary">Open chat</button>
@@ -95,14 +95,33 @@
                 'Read the scratch pad',
                 'Translate this text into "Yoda-speak"',
                 'Summarize the scratch pad and append that text',
+                'Propose a shorter rewrite of the scratch pad',
                 'What time is it on the server?'
             ],
             adapter: {
+                _undoById: {},
                 toolData: function (name) {
-                    if (name === 'read_draft') {
+                    if (name === 'read_draft' || name === 'propose_draft_rewrite') {
                         return { text: draft.value, selection: selectionOf() };
                     }
                     return {};
+                },
+                renderProposalPreview: function (proposal) {
+                    return (proposal && proposal.preview) || '';
+                },
+                applyProposal: function (proposal) {
+                    const payload = (proposal && proposal.payload) || {};
+                    this._undoById[proposal.id] = draft.value;
+                    draft.value = String(payload.text || '');
+                    return true;
+                },
+                undoProposal: function (proposal) {
+                    if (!proposal || this._undoById[proposal.id] == null) {
+                        return false;
+                    }
+                    draft.value = this._undoById[proposal.id];
+                    delete this._undoById[proposal.id];
+                    return true;
                 },
                 executeTool: function (name, args) {
                     if (name !== 'append_draft') {
