@@ -3,7 +3,7 @@
  * @tagline         System prompt assembly
  * @description     Framework owns order; the site owns the words
  * @file            plugins/ai-core/webapp/utils/agent/prompt.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -85,12 +85,13 @@ export function historyToMessages(turns, maxChars) {
         if (maxChars && used + chunk > maxChars) {
             break;
         }
+        if (!agentText) {
+            continue;
+        }
         if (userText) {
             messages.push({ role: 'user', content: userText });
         }
-        if (agentText) {
-            messages.push({ role: 'assistant', content: agentText });
-        }
+        messages.push({ role: 'assistant', content: agentText });
         used += chunk;
     }
     return messages;

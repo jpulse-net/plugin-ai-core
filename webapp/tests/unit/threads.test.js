@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Threads
  * @tagline         One active thread per scope and user
  * @file            plugins/ai-core/webapp/tests/unit/threads.test.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -45,6 +45,84 @@ describe('threads', () => {
         });
         expect(String(next._id)).not.toBe(String(first._id));
         expect(collection.docs.filter(d => d.scopeId === 'doc-1')).toHaveLength(2);
+    });
+
+    test('startNew archives the active slot instead of reopening it', async () => {
+        const collection = memoryCollection();
+        AiThreadModel.useCollection(collection);
+        const first = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-new',
+            createdBy: 'jdoe'
+        });
+        await AiThreadModel.archive(first._id);
+        const second = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-new',
+            createdBy: 'jdoe'
+        });
+        const reused = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-new',
+            createdBy: 'jdoe'
+        });
+        expect(String(reused._id)).toBe(String(second._id));
+        const started = await AiThreadModel.startNew({
+            scopeType: 'doc',
+            scopeId: 'doc-new',
+            createdBy: 'jdoe'
+        });
+        expect(String(started._id)).not.toBe(String(first._id));
+        expect(String(started._id)).not.toBe(String(second._id));
+        expect(started.status).toBe('active');
+        const listed = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-new'
+        });
+        expect(listed).toHaveLength(3);
+        const secondAfter = listed.find((row) => String(row._id) === String(second._id));
+        expect(secondAfter.status).toBe('archived');
+    });
+
+    test('listForOwner is newest first and honors limit', async () => {
+        const collection = memoryCollection();
+        AiThreadModel.useCollection(collection);
+        const first = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-list',
+            createdBy: 'jdoe',
+            now: new Date('2026-01-01T00:00:00Z')
+        });
+        await AiThreadModel._update(first._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-01-01T00:00:00Z')
+        });
+        const second = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-list',
+            createdBy: 'jdoe',
+            now: new Date('2026-02-01T00:00:00Z')
+        });
+        await AiThreadModel._update(second._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-02-01T00:00:00Z')
+        });
+        const third = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-list',
+            createdBy: 'jdoe',
+            now: new Date('2026-03-01T00:00:00Z')
+        });
+        const listed = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-list',
+            limit: 2
+        });
+        expect(listed).toHaveLength(2);
+        expect(String(listed[0]._id)).toBe(String(third._id));
+        expect(String(listed[1]._id)).toBe(String(second._id));
     });
 
     test('updateThread can set label and the provider/model pair', async () => {

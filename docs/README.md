@@ -1,6 +1,6 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.1
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.2
 
-A jPulse site gets an agent by configuring one rather than building one. This page is the server half: tools, quota, turns, and HTTP. The chat panel, shared tool modules, propose/apply, and attachments arrive in later releases of this plugin.
+A jPulse site gets an agent by configuring one rather than building one.
 
 ## The simple case
 
@@ -8,6 +8,7 @@ Install (both members auto-enable), then pick settings on Site Configuration →
 
 ```
 npx jpulse plugin install @jpulse-net/plugin-ai-core
+npx jpulse plugin install @jpulse-net/plugin-ai-anthropic
 ```
 
 One site controller — this is the entire server side:
@@ -53,22 +54,17 @@ export default class DocAgentController {
 }
 ```
 
-Until the chat panel ships, start a thread and a turn over HTTP:
+One line in the view:
 
-```
-POST /api/1/ai/thread          { "scopeType": "doc", "scopeId": "<id>" }
-POST /api/1/ai/thread/:id/turn { "text": "Summarize this document." }
-PUT  /api/1/ai/thread/:id      { "label": "Outline", "provider": "ai-mock", "model": "mock-echo" }
-POST /api/1/ai/thread/:id/cancel
+```js
+jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
 ```
 
-The turn call is Server-Sent Events. Cancel is the third call — not closing the SSE connection. On this Node + POST+SSE path, HTTP close often fires when the JSON body is consumed, so treating it as “client gone” would abort every turn.
+The namespace is `jPulse.ai`, not `jPulse.plugins.aiCore`. That is deliberate: this is the site-facing client API, the mirror of `global.AiCore` on the server.
 
-A turn that names `provider` and `model` records that pair on the thread so the next find-or-create keeps it. `PUT /api/1/ai/thread/:id` can change the pair (and the label) without starting a turn. A pair that is not on the live menu is rejected.
+Until you want a client-host tool, the transport stays HTTP. `GET /api/1/ai/capability` tells the panel which to use. Cancel is always `POST /api/1/ai/thread/:id/cancel`.
 
-`ai-mock` answers without an API key. Prefix `[mock:text]`, `[mock:tools]`, `[mock:retry]`, `[mock:fatal]`, `[mock:slow]`, or `[mock:hang]` to pick a script.
-
-`GET /api/1/ai/capability?scopeType=doc&scopeId=<id>` returns the transport (`http` when no client-host tool is offered), the offered tools, the model menu, and quota. A registered provider with `configured: false` (no API key) is omitted from the menu. `?hasImages=1` leaves those rows in the list and marks non-vision models `{ available: false, reason: "vision" }` — the seam the picker uses before attachments exist.
+`ai-mock` answers without an API key. Open `/hello-ai/` to see the panel, a scratch pad, and both hosts.
 
 ## Tool descriptor
 
@@ -76,9 +72,11 @@ Everything but `name`, `description`, and `schema` has a default.
 
 | Field | Default | Notes |
 |---|---|---|
-| `host` | `server` | `client` is accepted and withheld from execution until the panel item |
+| `host` | `server` | `client` runs in the origin tab over the WebSocket |
+| `module` | `null` | Shared pure module name under `utils/ai-tools/` |
+| `dataScope` | `call` | `call` or `turn`; only with `module` |
 | `requires` | `null` | Named capability, e.g. `scope:read` |
-| `mutates` | `false` | |
+| `mutates` | `false` | A flag. Direct writes are not propose/apply |
 | `timeoutMs` | `5000` | |
 | `group` | `read` | Admin policy grouping |
 | `budget` | `null` | `{ key, max, countWhen, overMessage, overHint }` |
@@ -86,57 +84,72 @@ Everything but `name`, `description`, and `schema` has a default.
 | `exposeToMcp` | `true` | Ignored for `host: 'client'` |
 | `owner` | stamped | Never supplied |
 
-## Four gates
+## Three tool shapes
 
-In order, all server-side, all before execution:
+| Shape | When to use |
+|---|---|
+| Server hook | Ordinary case. `onAiToolExecute` returns the result |
+| Client module | Pure computation over browser-only data. `run(data, args)` in `utils/ai-tools/` |
+| Client escape hatch | Side effects in the tab (DOM writes). `adapter.executeTool` — cannot be a module |
 
-1. Existence — unknown name → `AI_UNKNOWN_TOOL`
-2. Capability — `requires` against the actor's capabilities for this scope
-3. Admin policy — enabled unless the admin explicitly unchecked it (a new tool is on by default)
-4. Turn budget — declarative counters and optional argument dedupe
+A module is one function and must stay pure: relative imports of siblings inside `utils/ai-tools/` only, no bare specifiers, no `import()`. `AiCore.scanToolModules()` is the one-line site test over `site/webapp/utils/ai-tools/`. A violation is withheld from the model, not a broken page.
 
-`canRead` / `canWrite` from `onAiScopeResolve` are sugar for `scope:read` / `scope:write`. A finer per-scope rule is another capability name on the tool and in the handler — not a second tool list.
+Modules are served at `GET /api/1/ai/tool-module/:hash/:name.js` (`auth: user`, immutable cache). A stale hash is 409.
 
-The offered list is computed by one function, every round. The turn loop, the capability probe, and later MCP `tools/list` all use it.
+## Adapter
 
-## Quota
+```js
+jPulse.ai.panel.create({
+    scopeType: 'doc',
+    scopeId:   docId,
+    adapter: {
+        toolData(name) { … },
+        describeScope() { … },
+        describeContext() { … },
+        describeTarget() { … },
+        executeTool(name, args) { … }
+    }
+});
+```
 
-A turn is charged to one subject, defaulting to the username. Caps are named dimensions over `day` and `month`. The shipped default is 200 requests/day and 400000 tokens/day. Enforcement is at turn start only: a turn that starts under its caps runs to completion even if it ends over. After SSE headers are sent, an exceeded cap is an `error` event with `AI_QUOTA_EXCEEDED`, not a JSON HTTP 429.
+`adapter` may be omitted. `toolData` plus the three `describe*` methods are enough for a read-only agent. `executeTool` is the exception, not the interface.
 
-`ai-core` registers the shipped policy on `onAiQuotaCheck` / `onAiQuotaSettle` at priority 1000. A site handler at the default priority can return `{ subject, caps }` to replace it.
+## Slash commands
 
-An unknown model records `null` cost, never zero. The usage page flags `costUnknown`.
+Resolved in the panel; none are sent to the model.
 
-## Actor
+| Command | Action |
+|---|---|
+| `/help` | List commands |
+| `/tools` | Offered tools (with host) and withheld tools (with reason) |
+| `/model` | Show the current pair and the allowed list; `/model provider/model` sets the pair |
+| `/new` | Start a conversation |
+| `/cancel` | Cancel the running turn |
 
-Authorization takes `{ username, roles, onBehalfOf, origin, scopeType, scopeId, req }`. `req` is optional. `onBehalfOf` is reserved and logged whenever it is set; nothing in this release populates it. Thread ownership follows it when present.
+Typing `/` opens the picker. Enter runs the highlighted command and posts it into the transcript. Esc dismisses the picker. `//help` sends the literal text `/help`. `/help` can list page-specific examples passed as `examples` on `panel.create`.
 
-## Hook catalog
+The model is not in the panel header. `/model` is how you view and set it. Conversation title, switch, rename, and new conversation sit on one row under the title.
 
-| Hook | Mode | onError |
+## Hello AI
+
+`/hello-ai/` is a scratch pad. It never reaches the server. User-facing copy uses that one name, not draft or summary.
+
+| Tool | Host | Path |
 |---|---|---|
-| `onAiProviderRegister` | execute | continue |
-| `onAiComplete` | executeForPlugin | abort |
-| `onAiToolRegister` | execute | continue |
-| `onAiToolExecute` | executeForPlugin | abort |
-| `onAiToolData` | executeFirst | abort |
-| `onAiScopeResolve` | executeFirst | abort |
-| `onAiPromptFragment` | execute | continue |
-| `onAiQuotaCheck` | executeFirst | abort |
-| `onAiQuotaSettle` | execute | continue |
-| `onAiTurnBefore` | execute | abort |
-| `onAiTurnAfter` | execute | continue |
+| `read_draft` | client | module `readDraft` |
+| `append_draft` | client | `adapter.executeTool`, `mutates: true`, 3 writes per turn |
+| `get_hello_clock` | server | `onAiToolExecute` |
 
-Four of these are what the simple case uses.
+`append_draft` writes immediately. That is not propose/apply — there is no Apply card. Propose/apply is a later, opt-in pattern.
+
+Those tools register only when `scopeType` is `hello-ai`. Installing the bundle does not force a WebSocket on every other page.
+
+Type the examples from `/help` in the panel. For `curl`, prefix `[mock:tool:<name>:<jsonArgs>]`. JSON arrays cannot be typed in the bracket form (`]` ends the marker); objects and scalars are fine. The structured `script` field is still accepted on a turn if a site wants to drive tools without the model choosing them.
+
+## Still absent
+
+Attachments, URL ingest, and vision; Apply cards and the false-claim guard.
 
 ## Admin
 
-Site Configuration → AI holds the master switch, allowed roles, default provider/model, quota caps, loop limits, tool policy, retention, auto-title, and site instructions. The default is the admin pair when both fields match a live menu row; a provider alone picks that provider's first model; otherwise the first configured model. An empty allowed list keeps every configured provider on the menu (including `ai-mock`). The first completed turn on an unlabeled thread gets a short label from the user text when auto-title is on. `/jpulse-plugins/ai-core.shtml` shows the live capability probe (default model, menu, quota) and links to `/api/1/ai/capability`.
-
-Debug dumps stay on Admin → Plugins → ai-core so they are harder to leave on. That page also links to Site Configuration, the AI Core overview, AI usage, and this guide. When dumps are on, each round logs the assembled prompt and a clipped response line.
-
-Admin → AI usage reports per-subject requests, tokens, and cost by period, with over-quota and unknown-cost flags. Daily and monthly rows are written on every settle.
-
-## Later
-
-Client-host tools and the floating chat panel, propose/apply, and attachments are not in 1.0.1. `host: 'client'` descriptors are accepted and withheld, not rejected.
+Site Configuration → AI holds the master switch, roles, models, quota, loop limits, tool policy, retention, auto-title, and site instructions. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.

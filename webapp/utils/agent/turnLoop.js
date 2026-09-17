@@ -3,7 +3,7 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -193,6 +193,7 @@ export async function runTurn(params) {
 
     clearCancel(String(thread._id));
     const budgetState = params.budgetState || createBudgetState();
+    const moduleDataCache = params.moduleDataCache || new Map();
     const usage = emptyUsage();
     let turn = null;
     let status = 'failed';
@@ -403,13 +404,16 @@ export async function runTurn(params) {
                     const result = await executeTool({
                         name: call.name,
                         args: call.args || {},
+                        callId: call.id,
                         tool: resolved.tools.find(t => t.name === call.name),
                         actor,
                         scope: resolved.scope,
                         policy: settings.policy,
                         budgetState,
                         settings,
-                        hookManager
+                        hookManager,
+                        clientExecutor: params.clientExecutor,
+                        moduleDataCache
                     });
                     usage.toolCalls += 1;
                     results.push({ id: call.id, name: call.name, args: call.args || {}, result });
@@ -425,17 +429,20 @@ export async function runTurn(params) {
                     content: '',
                     toolCalls: toolUse.calls
                 });
-                messages.push({
-                    role: 'user',
-                    content: JSON.stringify(results.map(row => ({
+                results.forEach((row) => {
+                    messages.push({
+                        role: 'tool',
+                        toolCallId: row.id,
                         id: row.id,
                         name: row.name,
-                        ok: row.result.ok,
-                        error: row.result.error,
-                        hint: row.result.hint,
-                        data: row.result.data,
-                        summary: row.result.summary
-                    })))
+                        content: {
+                            ok: row.result.ok,
+                            error: row.result.error,
+                            hint: row.result.hint,
+                            data: row.result.data,
+                            summary: row.result.summary
+                        }
+                    });
                 });
                 if (stalled) {
                     stop = true;

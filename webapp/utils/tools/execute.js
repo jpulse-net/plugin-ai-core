@@ -1,9 +1,9 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tools / Execute
  * @tagline         Server-host tool execution
- * @description     Four gates, then onAiToolExecute; client-host is withheld until W-225
+ * @description     Four gates, then client executor, module run, or onAiToolExecute
  * @file            plugins/ai-core/webapp/utils/tools/execute.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -22,7 +22,47 @@ import {
     stripMedia
 } from './envelope.js';
 import { gateTool } from './gates.js';
+import { inspectModule, runModule } from './modules.js';
 import { getTool } from './registry.js';
+
+function normalizeResult(raw, tool) {
+    if (raw && typeof raw === 'object' && ('ok' in raw || 'data' in raw || 'code' in raw)) {
+        return makeEnvelope({ ...raw, ok: raw.ok !== false });
+    }
+    if (raw !== undefined) {
+        return makeEnvelope({
+            ok: true,
+            data: raw,
+            summary: `${tool.name} ok`
+        });
+    }
+    return makeEnvelope({
+        ok: false,
+        code: AI_EXECUTE_FAILED,
+        error: `No handler produced a result for ${tool.name}.`,
+        hint: 'The tool owner must handle onAiToolExecute.',
+        summary: `${tool.name} no handler`
+    });
+}
+
+async function resolveModuleData(tool, params, hookManager) {
+    const cache = params.moduleDataCache;
+    if (tool.dataScope === 'turn' && cache && cache.has(tool.name)) {
+        return cache.get(tool.name);
+    }
+    const ctx = {
+        tool,
+        actor: params.actor,
+        data: undefined
+    };
+    if (hookManager && typeof hookManager.executeFirst === 'function') {
+        await hookManager.executeFirst('onAiToolData', ctx);
+    }
+    if (tool.dataScope === 'turn' && cache) {
+        cache.set(tool.name, ctx.data);
+    }
+    return ctx.data;
+}
 
 function withTimeout(promise, timeoutMs) {
     const ms = Number.isFinite(timeoutMs) ? timeoutMs : 5000;
@@ -72,17 +112,68 @@ export async function executeTool(params) {
     }
 
     if (tool.host === 'client') {
-        return makeEnvelope({
-            ok: false,
-            code: AI_CLIENT_HOST,
-            error: 'Client-host tools are not executed on this path.',
-            hint: 'Use a server-host tool, or a transport that can reach the origin tab.',
-            summary: `${tool.name} client-host`,
-            ms: Date.now() - started
-        });
+        if (typeof params.clientExecutor !== 'function') {
+            return makeEnvelope({
+                ok: false,
+                code: AI_CLIENT_HOST,
+                error: 'Client-host tools are not executed on this path.',
+                hint: 'Use a server-host tool, or a transport that can reach the origin tab.',
+                summary: `${tool.name} client-host`,
+                ms: Date.now() - started
+            });
+        }
+        recordBudgetAndDedupe(tool, args, params.budgetState);
+        const moduleInfo = tool.module ? inspectModule(tool.module) : { ok: true };
+        try {
+            const raw = await withTimeout(
+                params.clientExecutor({
+                    id: params.callId || '',
+                    name: tool.name,
+                    args,
+                    module: tool.module || null,
+                    moduleHash: moduleInfo.hash || null
+                }),
+                tool.timeoutMs
+            );
+            let envelope = normalizeResult(raw, tool);
+            envelope.ms = Date.now() - started;
+            envelope = stripMedia(envelope);
+            return enforceSizeCap(envelope, params.sizeCap);
+        } catch (error) {
+            return makeEnvelope({
+                ok: false,
+                code: error.code || AI_EXECUTE_FAILED,
+                error: error.message || 'Client-host tool failed.',
+                hint: 'Retry the turn when the origin tab is connected.',
+                summary: `${tool.name} failed`,
+                ms: Date.now() - started
+            });
+        }
     }
 
     recordBudgetAndDedupe(tool, args, params.budgetState);
+
+    if (tool.module) {
+        try {
+            const data = await resolveModuleData(tool, params, hookManager);
+            const raw = await withTimeout(runModule(tool.module, data, args), tool.timeoutMs);
+            let envelope = normalizeResult(raw, tool);
+            envelope.ms = Date.now() - started;
+            if (params.fromClient === true) {
+                envelope = stripMedia(envelope);
+            }
+            return enforceSizeCap(envelope, params.sizeCap);
+        } catch (error) {
+            return makeEnvelope({
+                ok: false,
+                code: AI_EXECUTE_FAILED,
+                error: error.message || 'Tool module failed.',
+                hint: 'Fix the module or its data hook.',
+                summary: `${tool.name} failed`,
+                ms: Date.now() - started
+            });
+        }
+    }
 
     const ctx = {
         tool,
@@ -111,24 +202,7 @@ export async function executeTool(params) {
         });
     }
 
-    let envelope;
-    if (ctx.result && typeof ctx.result === 'object' && ('ok' in ctx.result || 'data' in ctx.result)) {
-        envelope = makeEnvelope({ ...ctx.result, ok: ctx.result.ok !== false });
-    } else if (ctx.result !== undefined) {
-        envelope = makeEnvelope({
-            ok: true,
-            data: ctx.result,
-            summary: `${tool.name} ok`
-        });
-    } else {
-        envelope = makeEnvelope({
-            ok: false,
-            code: AI_EXECUTE_FAILED,
-            error: `No handler produced a result for ${tool.name}.`,
-            hint: 'The tool owner must handle onAiToolExecute.',
-            summary: `${tool.name} no handler`
-        });
-    }
+    let envelope = normalizeResult(ctx.result, tool);
 
     envelope.ms = Date.now() - started;
     if (params.fromClient === true) {

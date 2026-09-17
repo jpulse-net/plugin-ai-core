@@ -3,7 +3,7 @@
  * @tagline         Tool result envelope and size cap
  * @description     Normalized tool result shape and the hardcoded byte cap (TD-01)
  * @file            plugins/ai-core/webapp/utils/tools/envelope.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -22,6 +22,7 @@ export const AI_DEDUPE = 'AI_DEDUPE';
 export const AI_RESULT_TOO_LARGE = 'AI_RESULT_TOO_LARGE';
 export const AI_CLIENT_HOST = 'AI_CLIENT_HOST';
 export const AI_EXECUTE_FAILED = 'AI_EXECUTE_FAILED';
+export const AI_MISSING_ADAPTER = 'AI_MISSING_ADAPTER';
 
 /**
  * @param {object} [partial]

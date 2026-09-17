@@ -1,9 +1,9 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Transport
  * @tagline         Transport layer public surface
- * @description     HTTP/SSE for controller-centric turns; WebSocket waits for W-225
+ * @description     HTTP/SSE for controller-centric turns; WebSocket for client-host tools
  * @file            plugins/ai-core/webapp/utils/transport/index.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,6 +13,15 @@
  */
 
 export { openSseTurn, SSE_HEARTBEAT_MS, writeSseComment, writeSseEvent, writeSseHeaders } from './sse.js';
+export {
+    AI_WS_MAX_SIZE,
+    AI_WS_PATTERN,
+    authorizeAiSocket,
+    executeClientTool,
+    mapClientReply,
+    namespacePath,
+    registerAiNamespace
+} from './ws.js';
 
 /**
  * HTTP is enough when no offered tool is client-host.

@@ -3,7 +3,7 @@
  * @tagline         Tools layer public surface
  * @description     Registry, actor, gates, budgets, envelope — no agent or transport imports
  * @file            plugins/ai-core/webapp/utils/tools/index.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -27,6 +27,7 @@ export {
     AI_CLIENT_HOST,
     AI_DEDUPE,
     AI_EXECUTE_FAILED,
+    AI_MISSING_ADAPTER,
     AI_POLICY_DENIED,
     AI_RESULT_TOO_LARGE,
     AI_UNKNOWN_TOOL,
@@ -36,6 +37,20 @@ export {
     stripMedia
 } from './envelope.js';
 export { executeTool } from './execute.js';
+export {
+    defaultRoots,
+    discoverToolModules,
+    getModuleByHash,
+    getModuleByName,
+    hashSource,
+    importSpecs,
+    inspectModule,
+    listModuleManifest,
+    resetModuleCatalog,
+    runModule,
+    scanModuleSource,
+    scanToolModules
+} from './modules.js';
 export { authorizeTool, gateTool } from './gates.js';
 export { isToolEnabled, normalizePolicy, seedReviewedNames } from './policy.js';
 export {

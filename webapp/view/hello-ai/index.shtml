@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!--
+ * @name            jPulse Framework / Plugins / AI Core / WebApp / View / Hello AI / Index
+ * @tagline         hello-ai scratch-pad demo
+ * @description     Floating chat panel over browser-only draft state
+ * @file            plugins/ai-core/webapp/view/hello-ai/index.shtml
+ * @version         1.0.2
+ * @release         2026-09-17
+ * @repository      https://github.com/jpulse-net/plugin-ai-core
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
+ * @genai           80%, Cursor 3.20, Grok 4.6
+-->
+<html {{appConfig.system.htmlAttrs}}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello AI - {{app.site.shortName}}</title>
+    {{file.include "jpulse-header.tmpl"}}
+    <style>
+    .local-pad-block {
+        display: block;
+        margin-bottom: 24px;
+    }
+    .local-pad-block .jp-label {
+        display: block;
+    }
+    .local-pad {
+        display: block;
+        height: 420px;
+        min-height: 220px;
+        min-width: 200px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 12px;
+        resize: both;
+    }
+    </style>
+</head>
+<body>
+    {{#component "helloCards.ai" order=80}}
+        <a href="/hello-ai/" class="jp-card-dashboard jp-icon-btn">
+            <div class="jp-icon-container"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></div>
+            <h3 class="jp-card-title">Hello AI</h3>
+            <p class="jp-card-description">AI chat panel with a scratch pad that stays in the browser</p>
+        </a>
+    {{/component}}
+    <div class="jp-main">
+        <div class="jp-container-800">
+            <div class="jp-page-header">
+                <h1><svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> Hello AI</h1>
+                <span class="jp-subtitle">A chat panel and a scratch pad that stay on this tab</span>
+            </div>
+            <p>
+                This page is a demo of the AI chat panel. Edit the scratch pad below —
+                that text never leaves this tab — then open the chat and ask the agent
+                to read it, add to it, or tell you the server time. In the panel,
+                type <code>/help</code> for example prompts.
+            </p>
+            <p>
+                <button type="button" id="hello-ai-launch" class="jp-btn jp-btn-primary">Open chat</button>
+            </p>
+            <div class="local-pad-block">
+                <label for="hello-ai-draft" class="jp-label">Scratch pad</label>
+                <textarea id="hello-ai-draft" class="jp-form-textarea local-pad">The text details how the Jedi Knights maintained peace drawing strength from the Force before political decay and commerce guilds led to the militarized Galactic Empire, which enforces order through technological terror like TIE fighters, Star Destroyers, and cybernetic life-support systems. You can find the full technical textbook excerpt in the referenced web documents.</textarea>
+            </div>
+            <p>
+                <a href="/jpulse-docs/installed-plugins/ai-core/README">AI Core guide</a>
+                ·
+                <a href="/jpulse-plugins/ai-core.shtml">AI Core overview</a>
+            </p>
+        </div>
+    </div>
+    {{file.include "jpulse-footer.tmpl"}}
+    <script>
+    jPulse.dom.ready(function () {
+        const draft = document.getElementById('hello-ai-draft');
+
+        function selectionOf() {
+            const start = draft.selectionStart || 0;
+            const end = draft.selectionEnd || 0;
+            if (end <= start) {
+                return '';
+            }
+            return draft.value.slice(start, end);
+        }
+
+        jPulse.ai.panel.create({
+            scopeType: 'hello-ai',
+            scopeId: 'demo',
+            launcher: '#hello-ai-launch',
+            examples: [
+                'Read the scratch pad',
+                'Translate this text into "Yoda-speak"',
+                'Summarize the scratch pad and append that text',
+                'What time is it on the server?'
+            ],
+            adapter: {
+                toolData: function (name) {
+                    if (name === 'read_draft') {
+                        return { text: draft.value, selection: selectionOf() };
+                    }
+                    return {};
+                },
+                executeTool: function (name, args) {
+                    if (name !== 'append_draft') {
+                        return {
+                            ok: false,
+                            code: 'AI_UNKNOWN_TOOL',
+                            error: 'Unknown client tool ' + name
+                        };
+                    }
+                    const text = String(args && args.text || '');
+                    const prefix = draft.value && !draft.value.endsWith('\n') ? '\n' : '';
+                    draft.value = draft.value + prefix + text;
+                    return {
+                        ok: true,
+                        data: { appended: text.length, totalChars: draft.value.length },
+                        summary: 'append_draft ' + text.length + ' chars'
+                    };
+                },
+                describeScope: function () {
+                    return 'Hello AI scratch pad';
+                },
+                describeContext: function () {
+                    return 'Unsaved scratch pad';
+                },
+                describeTarget: function () {
+                    return selectionOf() || 'all text';
+                }
+            }
+        });
+    });
+    </script>
+</body>
+</html>

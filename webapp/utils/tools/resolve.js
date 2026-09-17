@@ -3,7 +3,7 @@
  * @tagline         The one offered-tool-list function
  * @description     Recomputed every round; used by the loop, the probe, and later MCP
  * @file            plugins/ai-core/webapp/utils/tools/resolve.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -15,6 +15,7 @@
 import { normalizeActor } from './actor.js';
 import { publicTool } from './descriptor.js';
 import { authorizeTool } from './gates.js';
+import { inspectModule } from './modules.js';
 import { collectTools } from './registry.js';
 
 /**
@@ -70,6 +71,17 @@ export async function resolveTools(actor, options = {}) {
         if (denied) {
             withheld.push({ name: tool.name, reason: denied.code, error: denied.error });
             continue;
+        }
+        if (tool.module) {
+            const moduleInfo = inspectModule(tool.module);
+            if (!moduleInfo.ok) {
+                withheld.push({
+                    name: tool.name,
+                    reason: moduleInfo.reason === 'missing' ? 'missing-module' : 'impure-module',
+                    error: moduleInfo.reason
+                });
+                continue;
+            }
         }
         offered.push(tool);
     }

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Helpers
  * @tagline         In-memory collections and hook fakes
  * @file            plugins/ai-core/webapp/tests/unit/helpers.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -97,6 +97,19 @@ export function memoryCollection(options = {}) {
             applyPartialUnique(next);
             docs.push(next);
             return { insertedId: next._id };
+        },
+        async updateMany(query, update) {
+            let matched = 0;
+            for (const doc of docs) {
+                if (!matchQuery(doc, query)) {
+                    continue;
+                }
+                if (update.$set) {
+                    Object.assign(doc, update.$set);
+                }
+                matched += 1;
+            }
+            return { matchedCount: matched, modifiedCount: matched };
         },
         async updateOne(query, update, extra = {}) {
             let doc = docs.find(row => matchQuery(row, query));

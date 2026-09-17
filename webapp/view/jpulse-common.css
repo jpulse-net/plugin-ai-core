@@ -1,0 +1,201 @@
+/*
+ * @name            jPulse Framework / Plugins / AI Core / WebApp / View / jPulse Common CSS
+ * @tagline         plg-ai chat classes over jp-float-panel
+ * @description     Appended to the framework jpulse-common.css (W-098)
+ * @file            plugins/ai-core/webapp/view/jpulse-common.css
+ * @version         1.0.2
+ * @release         2026-09-17
+ * @repository      https://github.com/jpulse-net/plugin-ai-core
+ * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
+ * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
+ * @genai           80%, Cursor 3.20, Grok 4.6
+ */
+
+.plg-ai-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--jp-theme-bg-primary);
+    color: var(--jp-theme-text-primary);
+}
+
+.plg-ai-panel [hidden] {
+    display: none !important;
+}
+
+.plg-ai-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--jp-theme-border-color);
+    cursor: grab;
+    flex-shrink: 0;
+}
+
+.plg-ai-title {
+    flex: 1 1 auto;
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+
+.plg-ai-thread-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--jp-theme-border-color);
+    flex-shrink: 0;
+}
+
+.plg-ai-thread-select,
+.plg-ai-thread-edit {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.plg-ai-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.plg-ai-thread-row .jp-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plg-ai-notice {
+    padding: 6px 10px;
+    font-size: 0.85em;
+    color: var(--jp-theme-text-secondary);
+    background: var(--jp-theme-bg-secondary);
+    flex-shrink: 0;
+}
+
+.plg-ai-messages {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 10px 12px;
+    min-height: 0;
+}
+
+.plg-ai-user {
+    margin: 0 0 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--jp-theme-bg-secondary);
+    color: var(--jp-theme-text-primary);
+}
+
+.plg-ai-agent {
+    margin: 0 0 16px;
+    padding: 0 2px;
+}
+
+.plg-ai-pre {
+    position: relative;
+}
+
+.plg-ai-copy {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+}
+
+.plg-ai-compose {
+    position: relative;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--jp-theme-border-color);
+    flex-shrink: 0;
+}
+
+.plg-ai-slash {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding: 4px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 6px;
+    background: var(--jp-theme-bg-secondary);
+}
+
+.plg-ai-slash-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--jp-theme-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.plg-ai-slash-item:hover,
+.plg-ai-slash-item--active {
+    background: var(--jp-theme-bg-tertiary);
+}
+
+.plg-ai-input {
+    width: 100%;
+}
+
+.plg-ai-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.plg-ai-empty {
+    color: var(--jp-theme-text-secondary);
+    font-size: 0.9em;
+}
+
+.plg-ai-plain {
+    white-space: pre-wrap;
+}
+
+.plg-ai-dots {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 10px;
+    padding: 2px 0;
+}
+
+.plg-ai-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--jp-theme-text-muted);
+    animation: plg-ai-dot-jump 1s ease-in-out infinite;
+}
+
+.plg-ai-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.plg-ai-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes plg-ai-dot-jump {
+    0%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-4px);
+    }
+}
+
+/* EOF plugins/ai-core/webapp/view/jpulse-common.css */

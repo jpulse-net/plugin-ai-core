@@ -1,8 +1,8 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.1
+# jPulse Framework / Plugins / AI Core Plugin v1.0.2
 
-Server core of the jPulse AI agent: tool authorization, turns, quota, and HTTP/SSE streaming. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
+AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, and `jPulse.ai.panel`. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
 
-Requires jPulse Framework >= 2.0.2 (plugin translation merge).
+Requires jPulse Framework >= 2.0.3 (awaitable WebSocket `onCreate`).
 
 ## Install
 
@@ -42,7 +42,13 @@ The listing must show `package/package.json`, `package/plugins/ai-core/`, and `p
 
 ## What a site writes
 
-One controller and one line in the view (the panel arrives in a later item). Until then, `POST /api/1/ai/thread/:id/turn` runs a complete turn over SSE against `ai-mock`. Stop an in-flight turn with `POST /api/1/ai/thread/:id/cancel` — do not rely on closing the SSE connection.
+One controller and one line in the view:
+
+```js
+jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
+```
+
+The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. Open `/hello-ai/` for the scratch-pad demo (no API key).
 
 See [docs/README.md](docs/README.md).
 
@@ -74,5 +80,6 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.2: Chat panel (`jPulse.ai.panel`), client-host tools over a per-thread WebSocket, shared `utils/ai-tools/` modules, and the `/hello-ai/` scratch-pad demo. Requires framework >= 2.0.3.
 - 1.0.1: Model-selection surface — omit a provider with `configured: false`, persist the thread pair, accept `provider`/`model` on `PUT /api/1/ai/thread/:id`, grey non-vision rows when `?hasImages=1`, provider-only site default, and the live capability probe on `/jpulse-plugins/ai-core.shtml`.
 - 1.0.0: First release: tools layer, agent layer, mock-ready provider contract, HTTP/SSE, admin AI tab, usage page.

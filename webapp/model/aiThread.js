@@ -3,7 +3,7 @@
  * @tagline         Conversation threads
  * @description     One active thread per (scopeType, scopeId, createdBy); find-or-create lives here
  * @file            plugins/ai-core/webapp/model/aiThread.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -107,6 +107,26 @@ class AiThreadModel {
         }
     }
 
+    /**
+     * Start a new conversation: archive the active slot, then insert.
+     * @param {object} params
+     * @returns {Promise<object>}
+     */
+    static async startNew(params) {
+        const collection = this.getCollection();
+        const scopeType = String(params.scopeType || '');
+        const scopeId = String(params.scopeId || '');
+        const createdBy = String(params.createdBy || '');
+        if (!scopeType || !scopeId || !createdBy) {
+            throw new Error('scopeType, scopeId, and createdBy are required');
+        }
+        await collection.updateMany(
+            { scopeType, scopeId, createdBy, status: 'active' },
+            { $set: { status: 'archived', updatedAt: params.now || new Date() } }
+        );
+        return this.findOrCreateActive(params);
+    }
+
     static async findById(id) {
         const collection = this.getCollection();
         return collection.findOne({ _id: coerceId(id) });
@@ -122,7 +142,12 @@ class AiThreadModel {
         if (params.status) {
             query.status = params.status;
         }
-        return collection.find(query).sort({ updatedAt: -1 }).toArray();
+        let cursor = collection.find(query).sort({ updatedAt: -1 });
+        const limit = Number(params.limit);
+        if (Number.isFinite(limit) && limit > 0) {
+            cursor = cursor.limit(Math.min(Math.floor(limit), 100));
+        }
+        return cursor.toArray();
     }
 
     static async rename(id, label) {

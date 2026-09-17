@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.1
+ * @version         1.0.2
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -34,12 +34,16 @@ import AiTurnModel from '../model/aiTurn.js';
 import AiUsageModel from '../model/aiUsage.js';
 import {
     actorFromRequest,
+    discoverToolModules,
+    getModuleByHash,
+    listModuleManifest,
     onBehalfOfLogSuffix,
     registerTools,
     resolveTools,
+    scanToolModules,
     threadOwner
 } from '../utils/tools/index.js';
-import { chooseTransport, openSseTurn } from '../utils/transport/index.js';
+import { chooseTransport, openSseTurn, registerAiNamespace } from '../utils/transport/index.js';
 
 const LogController = global.LogController;
 const CommonUtils = global.CommonUtils;
@@ -168,6 +172,7 @@ class AiCoreController {
 
     static routes = [
         { method: 'GET', path: '/api/1/ai/capability', handler: 'apiCapability', auth: 'user' },
+        { method: 'GET', path: '/api/1/ai/tool-module/:hash/:file', handler: 'apiToolModule', auth: 'user' },
         { method: 'POST', path: '/api/1/ai/thread', handler: 'apiCreateThread', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread', handler: 'apiListThreads', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread/:id', handler: 'apiGetThread', auth: 'user' },
@@ -298,6 +303,8 @@ class AiCoreController {
         }
 
         subscribeCancelBroadcast();
+        discoverToolModules();
+        registerAiNamespace();
 
         const settings = await loadSettings();
         if (settings.retentionDays > 0) {
@@ -315,6 +322,7 @@ class AiCoreController {
         global.AiCore = {
             registerTools,
             resolveTools,
+            scanToolModules,
             runTurn: (opts) => runTurn({
                 ...opts,
                 threadModel: opts.threadModel || AiThreadModel,
@@ -375,9 +383,11 @@ class AiCoreController {
                     transport: chooseTransport(resolved.tools),
                     tools: resolved.publicTools,
                     withheld: resolved.withheld,
+                    modules: listModuleManifest(),
                     models: menu,
                     defaultModel: pickDefaultModel(menu, settings),
                     quota,
+                    retentionDays: settings.retentionDays,
                     scope: resolved.scope
                 }
             });
@@ -385,6 +395,31 @@ class AiCoreController {
         } catch (error) {
             logErr(req, 'aiCore.apiCapability', actorFromRequest(req), error);
             return sendError(req, res, 500, 'Failed to read AI capability', 'AI_CAPABILITY_FAILED');
+        }
+    }
+
+    static async apiToolModule(req, res) {
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiToolModule', actor);
+            discoverToolModules();
+            const file = String(req.params.file || '');
+            const name = file.replace(/\.js$/i, '');
+            const entry = getModuleByHash(req.params.hash, name);
+            if (!entry || !entry.ok) {
+                return sendError(req, res, 409, 'Tool module hash is stale; reload the page', 'AI_MODULE_STALE');
+            }
+            res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.send(entry.source);
+            logOk(req, 'aiCore.apiToolModule', actor, name);
+        } catch (error) {
+            logErr(req, 'aiCore.apiToolModule', actorFromRequest(req), error);
+            return sendError(req, res, 500, 'Failed to serve tool module', 'AI_MODULE_FAILED');
         }
     }
 
@@ -398,7 +433,7 @@ class AiCoreController {
             actor.scopeType = req.body?.scopeType || actor.scopeType;
             actor.scopeId = req.body?.scopeId || actor.scopeId;
             logReq(req, 'aiCore.apiCreateThread', actor);
-            const thread = await AiThreadModel.findOrCreateActive({
+            const fields = {
                 scopeType: actor.scopeType,
                 scopeId: actor.scopeId,
                 createdBy: threadOwner(actor),
@@ -406,7 +441,10 @@ class AiCoreController {
                 label: req.body?.label || '',
                 provider: req.body?.provider || settings.defaultProvider,
                 model: req.body?.model || settings.defaultModel
-            });
+            };
+            const thread = req.body?.forceNew
+                ? await AiThreadModel.startNew(fields)
+                : await AiThreadModel.findOrCreateActive(fields);
             res.json({ success: true, data: thread });
             logOk(req, 'aiCore.apiCreateThread', actor, String(thread._id));
         } catch (error) {
@@ -427,7 +465,8 @@ class AiCoreController {
                 createdBy: threadOwner(actor),
                 scopeType: req.query.scopeType,
                 scopeId: req.query.scopeId,
-                status: req.query.status
+                status: req.query.status,
+                limit: req.query.limit
             });
             res.json({ success: true, data: threads });
             logOk(req, 'aiCore.apiListThreads', actor, `${threads.length} threads`);
