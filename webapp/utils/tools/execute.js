@@ -3,7 +3,7 @@
  * @tagline         Server-host tool execution
  * @description     Four gates, then client executor, module run, or onAiToolExecute
  * @file            plugins/ai-core/webapp/utils/tools/execute.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -25,9 +25,25 @@ import { gateTool } from './gates.js';
 import { inspectModule, runModule } from './modules.js';
 import { getTool } from './registry.js';
 
+function liftMedia(raw) {
+    if (!raw || typeof raw !== 'object') {
+        return raw;
+    }
+    let media = raw.media;
+    let data = raw.data;
+    if (data && typeof data === 'object' && !Array.isArray(data) && data.media != null) {
+        if (media == null) {
+            media = data.media;
+        }
+        data = { ...data };
+        delete data.media;
+    }
+    return { ...raw, data, media };
+}
+
 function normalizeResult(raw, tool) {
     if (raw && typeof raw === 'object' && ('ok' in raw || 'data' in raw || 'code' in raw)) {
-        return makeEnvelope({ ...raw, ok: raw.ok !== false });
+        return makeEnvelope({ ...liftMedia(raw), ok: raw.ok !== false });
     }
     if (raw !== undefined) {
         return makeEnvelope({

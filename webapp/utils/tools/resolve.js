@@ -3,7 +3,7 @@
  * @tagline         The one offered-tool-list function
  * @description     Recomputed every round; used by the loop, the probe, and later MCP
  * @file            plugins/ai-core/webapp/utils/tools/resolve.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -63,6 +63,14 @@ export async function resolveTools(actor, options = {}) {
     const offered = [];
     const withheld = [];
     for (const tool of registered) {
+        if ((tool.name === 'get_source' || tool.name === 'list_sources')
+            && (options.settings?.sourcesEnabled === false || options.hasSources !== true)) {
+            withheld.push({
+                name: tool.name,
+                reason: options.settings?.sourcesEnabled === false ? 'sources-disabled' : 'no-sources'
+            });
+            continue;
+        }
         if (normalized.origin === 'mcp' && (tool.host === 'client' || tool.exposeToMcp === false)) {
             withheld.push({ name: tool.name, reason: 'mcp' });
             continue;

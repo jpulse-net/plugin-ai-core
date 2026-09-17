@@ -3,7 +3,7 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -120,6 +120,17 @@
     padding: 8px 10px 10px;
     border-top: 1px solid var(--jp-theme-border-color);
     flex-shrink: 0;
+    transition: box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.plg-ai-compose.plg-ai-drop--ok {
+    box-shadow: inset 0 0 0 2px var(--jp-theme-color-primary);
+    background: var(--jp-theme-bg-secondary);
+}
+
+.plg-ai-compose.plg-ai-drop--no {
+    box-shadow: inset 0 0 0 2px var(--jp-theme-color-danger);
+    background: var(--jp-theme-color-danger-bg);
 }
 
 .plg-ai-slash {
@@ -151,14 +162,26 @@
     background: var(--jp-theme-bg-tertiary);
 }
 
+.plg-ai-compose-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+}
+
 .plg-ai-input {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    min-height: 52px;
 }
 
 .plg-ai-actions {
     display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 0;
+    flex-shrink: 0;
 }
 
 .plg-ai-empty {
@@ -243,6 +266,169 @@
     margin: 0 0 12px;
     padding: 8px 10px;
     border-left: 3px solid var(--jp-theme-border-color);
+}
+
+.plg-ai-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 6px;
+}
+
+.plg-ai-strip-chips {
+    display: contents;
+}
+
+.plg-ai-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 999px;
+    background: var(--jp-theme-bg-secondary);
+    color: var(--jp-theme-text-primary);
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.plg-ai-chip-icon {
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.plg-ai-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 14em;
+}
+
+.plg-ai-chip-remove {
+    color: var(--jp-theme-text-secondary);
+}
+
+.plg-ai-chip-pop {
+    margin: 0 0 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 8px;
+    background: var(--jp-theme-bg-secondary);
+    font-size: 0.8em;
+    line-height: 1.25;
+}
+
+.plg-ai-chip-pop-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    margin: 0;
+}
+
+.plg-ai-chip-pop-label {
+    color: var(--jp-theme-text-secondary);
+    min-width: 5em;
+}
+
+.plg-ai-chip-pop-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.plg-ai-chip-pop-copy {
+    padding: 0 6px;
+    min-height: 0;
+    line-height: 1.2;
+    height: auto;
+}
+
+.plg-ai-strip-add {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.plg-ai-strip-add .jp-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plg-ai-add-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 4px);
+    z-index: 6;
+    min-width: 10em;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 6px;
+    background: var(--jp-theme-bg-primary);
+    box-shadow: var(--jp-theme-shadow-md);
+}
+
+.plg-ai-add-menu[hidden] {
+    display: none;
+}
+
+.plg-ai-add-file,
+.plg-ai-add-url {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--jp-theme-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.plg-ai-add-file:hover,
+.plg-ai-add-url:hover {
+    background: var(--jp-theme-bg-tertiary);
+}
+
+.plg-ai-intercept {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 8px;
+    background: var(--jp-theme-bg-secondary);
+}
+
+.plg-ai-intercept-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.plg-ai-intercept-url {
+    word-break: break-all;
+    color: var(--jp-theme-text-secondary);
+    margin-bottom: 8px;
+}
+
+.plg-ai-intercept-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.plg-ai-refs {
+    font-size: 0.8em;
+    color: var(--jp-theme-text-secondary);
+    margin: 4px 0 8px;
 }
 
 @keyframes plg-ai-dot-jump {

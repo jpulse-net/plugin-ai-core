@@ -3,7 +3,7 @@
  * @tagline         Provider registry and capability map
  * @description     capabilities is a map; unknown keys read false
  * @file            plugins/ai-core/webapp/utils/agent/providers.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -80,7 +80,9 @@ export function filterAllowedModels(providers, settings = {}) {
                 provider: provider.plugin,
                 model: id,
                 label: (typeof model === 'object' && model.label) || `${provider.label} / ${id}`,
-                capabilities: provider.capabilities || {}
+                capabilities: (typeof model === 'object' && model.capabilities)
+                    || provider.capabilities
+                    || {}
             });
         }
     }

@@ -1,6 +1,6 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.3
+# jPulse Framework / Plugins / AI Core Plugin v1.0.4
 
-AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
+AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
 
 Requires jPulse Framework >= 2.0.3 (awaitable WebSocket `onCreate`).
 
@@ -48,7 +48,7 @@ One controller and one line in the view:
 jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
 ```
 
-The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. Open `/hello-ai/` for the scratch-pad demo (no API key).
+The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. Open `/hello-ai/` for the scratch-pad demo (no API key). Drop a file or paste an image on the panel to attach a source or try vision.
 
 See [docs/README.md](docs/README.md).
 
@@ -74,7 +74,7 @@ One file:
 npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 ```
 
-`--runInBand` matches the framework `test:unit` script. The suite covers the tools layer (plain actor, no Express request), the tools/agent/transport import boundary, the turn loop (multi-call `tool_use`, retry/fatal, cancel, timeout, lease rollback, persist provider/model), SSE streaming (a text delta before the provider hook resolves), quota, `onBehalfOf` logging, the active-thread unique index, MCP-origin filtering, usage upsert, plugin-config `debugDumps`, the `configured` menu filter, and vision gating.
+`--runInBand` matches the framework `test:unit` script. The suite covers the tools layer (plain actor, no Express request), the tools/agent/transport import boundary, the turn loop (multi-call `tool_use`, retry/fatal, cancel, timeout, lease rollback, persist provider/model), SSE streaming (a text delta before the provider hook resolves), quota, `onBehalfOf` logging, the active-thread unique index, MCP-origin filtering, usage upsert, plugin-config `debugDumps`, the `configured` menu filter, vision gating, and attachments (sources, ingest mapping, convert path, Redis mailbox, `data.media`, loop purity).
 
 `ai-mock` has no separate test tree; the loop and SSE tests drive it through `onAiComplete`.
 

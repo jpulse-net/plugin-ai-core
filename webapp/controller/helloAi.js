@@ -3,7 +3,7 @@
  * @tagline         hello-ai demo hooks
  * @description     Scratch-pad tools, gated on scopeType hello-ai
  * @file            plugins/ai-core/webapp/controller/helloAi.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -140,7 +140,11 @@ class HelloAiController {
             + 'read_draft reads the scratch pad. append_draft writes immediately. '
             + 'propose_draft_rewrite proposes a full replacement and creates an Apply card; it does not write. '
             + 'You may call it more than once in the same turn for alternatives; each call is its own card and all of them stay applyable. '
-            + 'Do not append a rewrite — propose it. get_hello_clock is a server-host tool.'
+            + 'Do not append a rewrite — propose it. get_hello_clock is a server-host tool. '
+            + 'You have no outbound URL-fetch or filesystem tool. The user attaches files and already-fetched pages in the panel; those last only for this tab until reload. '
+            + 'When they are present, read them with list_sources and get_source — a listed URL is ingested content, not a live link you open. '
+            + 'When they are not, ask the user to attach them again; do not say you cannot read files or the web. '
+            + 'If an image is attached and a vision model is selected, describe what it shows.'
         );
         return ctx;
     }

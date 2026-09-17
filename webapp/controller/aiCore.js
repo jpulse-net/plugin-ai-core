@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -51,6 +51,29 @@ import {
     proposalsFromTurn,
     undoProposalRecord
 } from '../utils/proposals/index.js';
+import {
+    clientFetchMessage,
+    convertDocument,
+    converterMimeList,
+    fetchAcceptList,
+    ingestFetchedBody,
+    isAllowedImageMime,
+    listConverters,
+    maxImageBytesOf,
+    normalizeImageMime,
+    publicConverters,
+    redisImagesAvailable,
+    stageImage,
+    threadHasStagedImages
+} from '../utils/attachments/index.js';
+import { sourceToolDescriptors } from '../utils/attachments/tools.js';
+import {
+    collectStreamBody,
+    headerOrQuery,
+    sanitizeImageMeta,
+    sanitizeSourceMeta
+} from '../utils/attachments/stream.js';
+import { AI_CONFIG_DEFAULTS } from '../utils/agent/settings.js';
 
 const LogController = global.LogController;
 const CommonUtils = global.CommonUtils;
@@ -194,6 +217,23 @@ class AiCoreController {
     static routes = [
         { method: 'GET', path: '/api/1/ai/capability', handler: 'apiCapability', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/tool-module/:hash/:file', handler: 'apiToolModule', auth: 'user' },
+        { method: 'POST', path: '/api/1/ai/source/fetch', handler: 'apiFetchSource', auth: 'user' },
+        {
+            method: 'POST',
+            path: '/api/1/ai/source/convert',
+            handler: 'apiConvertSource',
+            auth: 'user',
+            bodyMode: 'stream',
+            bodyLimit: '8mb'
+        },
+        {
+            method: 'POST',
+            path: '/api/1/ai/image/stage',
+            handler: 'apiStageImage',
+            auth: 'user',
+            bodyMode: 'stream',
+            bodyLimit: '5mb'
+        },
         { method: 'POST', path: '/api/1/ai/thread', handler: 'apiCreateThread', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread', handler: 'apiListThreads', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread/:id', handler: 'apiGetThread', auth: 'user' },
@@ -322,6 +362,102 @@ class AiCoreController {
                         startNewRow: true,
                         label: '{{i18n.view.ui.ai.config.proposalClaimPhrases}}',
                         help: '{{i18n.view.ui.ai.config.proposalClaimPhrasesHelp}}'
+                    },
+                    sourcesEnabled: {
+                        type: 'boolean',
+                        default: true,
+                        label: '{{i18n.view.ui.ai.config.sourcesEnabled}}'
+                    },
+                    sourceMimeTypes: {
+                        type: 'string',
+                        default: AI_CONFIG_DEFAULTS.sourceMimeTypes.join(', '),
+                        label: '{{i18n.view.ui.ai.config.sourceMimeTypes}}'
+                    },
+                    maxSourcesPerConversation: {
+                        type: 'number',
+                        default: 5,
+                        label: '{{i18n.view.ui.ai.config.maxSourcesPerConversation}}'
+                    },
+                    maxSourceChars: {
+                        type: 'number',
+                        default: 1000000,
+                        label: '{{i18n.view.ui.ai.config.maxSourceChars}}'
+                    },
+                    maxTotalSourceChars: {
+                        type: 'number',
+                        default: 2000000,
+                        label: '{{i18n.view.ui.ai.config.maxTotalSourceChars}}'
+                    },
+                    maxSourceReadChars: {
+                        type: 'number',
+                        default: 24000,
+                        label: '{{i18n.view.ui.ai.config.maxSourceReadChars}}'
+                    },
+                    maxSourceReadsPerTurn: {
+                        type: 'number',
+                        default: 8,
+                        label: '{{i18n.view.ui.ai.config.maxSourceReadsPerTurn}}'
+                    },
+                    urlIngestEnabled: {
+                        type: 'boolean',
+                        default: true,
+                        label: '{{i18n.view.ui.ai.config.urlIngestEnabled}}'
+                    },
+                    urlMaxBytes: {
+                        type: 'number',
+                        default: 5242880,
+                        label: '{{i18n.view.ui.ai.config.urlMaxBytes}}'
+                    },
+                    urlTimeoutMs: {
+                        type: 'number',
+                        default: 15000,
+                        label: '{{i18n.view.ui.ai.config.urlTimeoutMs}}'
+                    },
+                    urlAllowedHosts: {
+                        type: 'string',
+                        default: '',
+                        label: '{{i18n.view.ui.ai.config.urlAllowedHosts}}',
+                        help: '{{i18n.view.ui.ai.config.urlAllowedHostsHelp}}'
+                    },
+                    urlBlockedHosts: {
+                        type: 'string',
+                        default: '',
+                        label: '{{i18n.view.ui.ai.config.urlBlockedHosts}}'
+                    },
+                    maxConvertPages: {
+                        type: 'number',
+                        default: 100,
+                        label: '{{i18n.view.ui.ai.config.maxConvertPages}}'
+                    },
+                    convertTimeoutMs: {
+                        type: 'number',
+                        default: 30000,
+                        label: '{{i18n.view.ui.ai.config.convertTimeoutMs}}'
+                    },
+                    imagesEnabled: {
+                        type: 'boolean',
+                        default: true,
+                        label: '{{i18n.view.ui.ai.config.imagesEnabled}}'
+                    },
+                    imageMimeTypes: {
+                        type: 'string',
+                        default: AI_CONFIG_DEFAULTS.imageMimeTypes.join(', '),
+                        label: '{{i18n.view.ui.ai.config.imageMimeTypes}}'
+                    },
+                    maxImageBytes: {
+                        type: 'number',
+                        default: 4194304,
+                        label: '{{i18n.view.ui.ai.config.maxImageBytes}}'
+                    },
+                    maxImageEdge: {
+                        type: 'number',
+                        default: 2048,
+                        label: '{{i18n.view.ui.ai.config.maxImageEdge}}'
+                    },
+                    imageStageTtlSec: {
+                        type: 'number',
+                        default: 300,
+                        label: '{{i18n.view.ui.ai.config.imageStageTtlSec}}'
                     }
                 }
             });
@@ -337,6 +473,7 @@ class AiCoreController {
 
         subscribeCancelBroadcast();
         discoverToolModules();
+        registerTools(sourceToolDescriptors(), 'ai-core');
         registerAiNamespace();
 
         const settings = await loadSettings();
@@ -415,12 +552,26 @@ class AiCoreController {
             }
             const { settings, actor } = gated;
             logReq(req, 'aiCore.apiCapability', actor);
-            const resolved = await resolveTools(actor, { policy: settings.policy });
+            const hasSources = req.query.hasSources === '1'
+                || req.query.hasSources === 'true'
+                || req.query.hasSources === true;
+            const threadId = String(req.query.threadId || '');
+            const stagedImages = threadId
+                ? await threadHasStagedImages(threadOwner(actor), threadId)
+                : false;
+            const hasImages = queryHasImages(req.query) || stagedImages;
+            const resolved = await resolveTools(actor, {
+                policy: settings.policy,
+                settings,
+                hasSources
+            });
             const providers = await listProviders();
             const menu = gateModelsForVision(filterAllowedModels(providers, settings), {
-                hasImages: queryHasImages(req.query)
+                hasImages
             });
             const quota = await quotaSnapshot(actor.username, settings.caps);
+            const converters = publicConverters(await listConverters());
+            const imagesAvailable = settings.imagesEnabled !== false && redisImagesAvailable();
             res.json({
                 success: true,
                 data: {
@@ -433,7 +584,22 @@ class AiCoreController {
                     quota,
                     retentionDays: settings.retentionDays,
                     proposalClaimPhrases: settings.proposalClaimPhrases,
-                    scope: resolved.scope
+                    scope: resolved.scope,
+                    sourcesEnabled: settings.sourcesEnabled !== false,
+                    urlIngestEnabled: settings.urlIngestEnabled !== false,
+                    imagesEnabled: settings.imagesEnabled !== false,
+                    imagesAvailable,
+                    hasImages,
+                    converters,
+                    converterMimes: converterMimeList(converters),
+                    sourceMimeTypes: settings.sourceMimeTypes,
+                    maxSourcesPerConversation: settings.maxSourcesPerConversation,
+                    maxSourceChars: settings.maxSourceChars,
+                    maxTotalSourceChars: settings.maxTotalSourceChars,
+                    maxSourceReadChars: settings.maxSourceReadChars,
+                    maxImageBytes: settings.maxImageBytes,
+                    maxImageEdge: settings.maxImageEdge,
+                    imageMimeTypes: settings.imageMimeTypes
                 }
             });
             logOk(req, 'aiCore.apiCapability', actor, `${Date.now() - start}ms`);
@@ -681,6 +847,8 @@ class AiCoreController {
                     context: req.body?.context,
                     target: req.body?.target,
                     script: req.body?.script,
+                    sources: sanitizeSourceMeta(req.body?.sources),
+                    images: sanitizeImageMeta(req.body?.images),
                     threadModel: AiThreadModel,
                     turnModel: AiTurnModel,
                     usageModel: AiUsageModel
@@ -786,6 +954,184 @@ class AiCoreController {
         } catch (error) {
             logErr(req, 'aiCore.apiTurnUndone', actorFromRequest(req), error);
             return sendError(req, res, 500, 'Failed to mark proposal undone', 'AI_TURN_UNDONE');
+        }
+    }
+
+    static async apiFetchSource(req, res) {
+        const actorGuess = actorFromRequest(req);
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { settings, actor } = gated;
+            logReq(req, 'aiCore.apiFetchSource', actor);
+            if (settings.sourcesEnabled === false || settings.urlIngestEnabled === false) {
+                return sendError(req, res, 403, 'URL ingest is disabled', 'AI_SOURCES_DISABLED');
+            }
+            const url = String(req.body?.url || '').trim();
+            if (!url) {
+                return sendError(req, res, 400, 'url is required', 'AI_BAD_ARGS');
+            }
+            const UrlFetch = global.UrlFetch;
+            if (!UrlFetch || typeof UrlFetch.fetch !== 'function') {
+                return sendError(req, res, 500, 'URL fetch is not available', 'AI_NO_URL_FETCH');
+            }
+            const converters = await listConverters();
+            const fetched = await UrlFetch.fetch(url, {
+                as: 'text',
+                maxBytes: Math.min(settings.urlMaxBytes || 5242880, 10485760),
+                timeoutMs: settings.urlTimeoutMs || 15000,
+                allowedHosts: settings.urlAllowedHosts,
+                blockedHosts: settings.urlBlockedHosts,
+                acceptContentTypes: fetchAcceptList(settings, converters),
+                rateLimitKey: `ai-source-fetch:${threadOwner(actor)}`,
+                req
+            });
+            if (!fetched.success) {
+                return sendError(
+                    req,
+                    res,
+                    fetched.code === 'RATE_LIMIT_EXCEEDED' ? 429 : 400,
+                    clientFetchMessage(fetched),
+                    fetched.code || 'AI_FETCH_FAILED'
+                );
+            }
+            const ingested = ingestFetchedBody({
+                ...fetched,
+                sourceUrl: url
+            }, settings);
+            if (!ingested.ok) {
+                return sendError(
+                    req,
+                    res,
+                    400,
+                    ingested.error || clientFetchMessage(ingested),
+                    ingested.code || 'AI_FETCH_FAILED'
+                );
+            }
+            res.json({
+                success: true,
+                data: {
+                    text: ingested.text,
+                    name: ingested.name,
+                    mimeType: ingested.mimeType,
+                    truncated: ingested.truncated,
+                    provenance: ingested.provenance
+                }
+            });
+            logOk(req, 'aiCore.apiFetchSource', actor, ingested.provenance.finalUrl || url);
+        } catch (error) {
+            logErr(req, 'aiCore.apiFetchSource', actorGuess, error);
+            return sendError(req, res, 500, 'Failed to fetch URL', 'AI_FETCH_FAILED');
+        }
+    }
+
+    static async apiConvertSource(req, res) {
+        const actorGuess = actorFromRequest(req);
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { settings, actor } = gated;
+            logReq(req, 'aiCore.apiConvertSource', actor);
+            if (settings.sourcesEnabled === false) {
+                return sendError(req, res, 403, 'Sources are disabled', 'AI_SOURCES_DISABLED');
+            }
+            const bytes = await collectStreamBody(req, res, settings.maxSourceChars
+                ? Math.min(8 * 1024 * 1024, settings.maxSourceChars * 4)
+                : '8mb');
+            if (bytes == null) {
+                return;
+            }
+            const mimeType = headerOrQuery(req, 'x-ai-mime-type') || req.headers['content-type'] || '';
+            const name = headerOrQuery(req, 'x-ai-name') || 'Untitled';
+            const converted = await convertDocument({
+                bytes,
+                mimeType,
+                name,
+                settings
+            });
+            if (!converted.ok) {
+                return sendError(req, res, 400, converted.error, converted.code || 'AI_CONVERT_FAILED');
+            }
+            res.json({
+                success: true,
+                data: {
+                    text: converted.text,
+                    truncated: converted.truncated,
+                    truncatedBy: converted.truncatedBy,
+                    unit: converted.unit,
+                    limit: converted.limit
+                }
+            });
+            logOk(req, 'aiCore.apiConvertSource', actor, name);
+        } catch (error) {
+            logErr(req, 'aiCore.apiConvertSource', actorGuess, error);
+            return sendError(req, res, 500, 'Failed to convert document', 'AI_CONVERT_FAILED');
+        }
+    }
+
+    static async apiStageImage(req, res) {
+        const actorGuess = actorFromRequest(req);
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { settings, actor } = gated;
+            logReq(req, 'aiCore.apiStageImage', actor);
+            if (settings.imagesEnabled === false) {
+                return sendError(req, res, 403, 'Images are disabled', 'AI_IMAGES_DISABLED');
+            }
+            if (!redisImagesAvailable()) {
+                return sendError(req, res, 503, 'Image staging is not available', 'AI_NO_REDIS');
+            }
+            const cap = maxImageBytesOf(settings);
+            const bytes = await collectStreamBody(req, res, cap);
+            if (bytes == null) {
+                return;
+            }
+            const mimeType = normalizeImageMime(
+                headerOrQuery(req, 'x-ai-mime-type') || req.headers['content-type'] || ''
+            );
+            if (!isAllowedImageMime(mimeType, settings)) {
+                return sendError(req, res, 400, `Unsupported image type ${mimeType || 'unknown'}`, 'AI_IMAGE_TYPE');
+            }
+            if (bytes.length > cap) {
+                return sendError(req, res, 413, 'Image is over the size cap', 'PAYLOAD_TOO_LARGE');
+            }
+            const threadId = headerOrQuery(req, 'x-ai-thread-id');
+            const imageId = headerOrQuery(req, 'x-ai-image-id')
+                || `img-${Date.now().toString(16)}`;
+            const name = headerOrQuery(req, 'x-ai-name') || 'image';
+            if (!threadId) {
+                return sendError(req, res, 400, 'Thread id is required', 'AI_BAD_ARGS');
+            }
+            const thread = await this._ownedThread(req, actor, threadId);
+            if (thread == null) {
+                return sendError(req, res, 404, 'Thread not found', 'AI_THREAD_NOT_FOUND');
+            }
+            if (thread === false) {
+                return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
+            }
+            await stageImage(threadOwner(actor), String(thread._id), imageId, {
+                data: bytes.toString('base64'),
+                mimeType,
+                name,
+                width: Number(headerOrQuery(req, 'x-ai-width')) || 0,
+                height: Number(headerOrQuery(req, 'x-ai-height')) || 0
+            }, settings);
+            res.json({
+                success: true,
+                data: { id: imageId, bytes: bytes.length, mimeType }
+            });
+            logOk(req, 'aiCore.apiStageImage', actor, imageId);
+        } catch (error) {
+            logErr(req, 'aiCore.apiStageImage', actorGuess, error);
+            const status = error.code === 'AI_NO_REDIS' ? 503 : 500;
+            return sendError(req, res, status, error.message || 'Failed to stage image', error.code || 'AI_IMAGE_STAGE');
         }
     }
 

@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.3
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.4
 
 A jPulse site gets an agent by configuring one rather than building one.
 
@@ -118,6 +118,10 @@ jPulse.ai.panel.create({
 
 `adapter` may be omitted. `toolData` plus the three `describe*` methods are enough for a read-only agent. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`.
 
+`get_source` and `list_sources` are owned by the panel. The client bridge asks a panel-internal provider before `adapter.toolData`, so a site with no adapter still gets working sources. Those two names are reserved.
+
+`handle.sources()` returns metadata for the chips on this tab. `handle.sourceFile(id)` returns the original `File` or `Blob` the user dropped. `adapter.sourceAttachable(source)` is optional and decides which of those the site would accept on one of its own objects.
+
 `renderProposalPreview` may return a DOM node, or a string that the panel escapes as text. `applyProposal` and `undoProposal` perform the site's real write and resolve truthy on success. The panel records the outcome after the adapter resolves, so a failed write never marks a card applied.
 
 ## Slash commands
@@ -179,10 +183,24 @@ Those tools register only when `scopeType` is `hello-ai`. Installing the bundle 
 
 Type the examples from `/help` in the panel. For `curl`, prefix `[mock:tool:<name>:<jsonArgs>]`. JSON arrays cannot be typed in the bracket form (`]` ends the marker); objects and scalars are fine. The structured `script` field is still accepted on a turn if a site wants to drive tools without the model choosing them.
 
-## Still absent
+## Attachments
 
-Attachments, URL ingest, and vision.
+Sources stay on this tab and this conversation. A reload clears the chips. What survives is a `sourceRefs` badge on the turn: the evidence that external text entered, not the text itself. Hover a chip for a tooltip; click it for name, origin, URL, type, and size, with copy. File, URL, and image chips use a type icon. The plus button wraps on the same row as the last chip.
+
+The model never sees source text in the prompt. It sees a metadata manifest and reads through `list_sources` / `get_source` — outline first, then a section or a character window. Text comes back inside `<<<SOURCE …>>>` markers. The safety fragment already calls that a quotation, not a request.
+
+URL ingest is `POST /api/1/ai/source/fetch` on the framework `UrlFetch` helper. Host, size, and timeout caps are on Site Configuration → AI. A URL in the compose box offers to fetch it before the turn starts. The offer is hidden when the prompt is a question about the link rather than a request to read it. There is no agent-callable fetch. A listed URL is already ingested — the model reads that copy; it cannot fetch the live web. After a reload, chips are gone; ask the user to attach the file or URL again.
+
+Document conversion is `POST /api/1/ai/source/convert`, a streaming route (`bodyMode: 'stream'`). The plugin calls `onDocumentConvertRegister` / `onDocumentConvert` and does not define them. A PDF drop on a bare install is a clean refusal naming what to install. Production nginx can buffer the whole body if the streaming location is not enabled; the route still works, with `client_max_body_size` as the outer gate.
+
+Images are `POST /api/1/ai/image/stage`, also streaming. Bytes park in Redis, scoped to the user, thread, and image id, and are read once at send. Redis is required for images; the capability probe reports them unavailable and the panel hides the affordance when Redis is down. Gating is at send, against the thread's model, not at attach against the site default.
+
+A site tool that returns a picture puts it in `data.media`. The envelope lifts that field out of `data` so the tool-result message stays text. How many images one turn may pull in is an ordinary `budget` on the site's tool.
+
+What a site adds through `onAiPromptFragment` is domain steering — where to put a document, what to extract. The framework owns the lifetime notice, the read tool, the manifest, URL messages, and the vision path.
+
+`ai-mock` ships a Mock Vision row that names the images it was handed, so `/hello-ai/` can demonstrate the gate with no API key.
 
 ## Admin
 
-Site Configuration → AI holds the master switch, roles, models, quota, loop limits, tool policy, retention, auto-title, site instructions, and the false-claim phrase list. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.
+Site Configuration → AI holds the master switch, roles, models, quota, loop limits, tool policy, retention, auto-title, site instructions, the false-claim phrase list, and the source / URL / image caps. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.

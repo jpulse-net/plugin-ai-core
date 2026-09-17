@@ -3,7 +3,7 @@
  * @tagline         System prompt assembly
  * @description     Framework owns order; the site owns the words
  * @file            plugins/ai-core/webapp/utils/agent/prompt.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,6 +12,7 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
+import { formatImagesBlock, formatSourcesBlock, formatSourcesEmptyBlock } from '../attachments/index.js';
 import { annotateHistory, PROPOSE_PROMPT } from '../proposals/index.js';
 import { getCachedSettings } from './settings.js';
 
@@ -63,6 +64,20 @@ export async function assemblePrompt(params) {
     fragments.push(availability);
     if ((params.tools || []).some(tool => tool.proposes)) {
         fragments.push(PROPOSE_PROMPT);
+    }
+
+    const sourcesBlock = formatSourcesBlock(params.sources, params.scope?.nouns);
+    if (sourcesBlock) {
+        fragments.push(sourcesBlock);
+    } else if ((params.withheld || []).some((row) => (
+        (row.name === 'get_source' || row.name === 'list_sources')
+        && row.reason === 'no-sources'
+    ))) {
+        fragments.push(formatSourcesEmptyBlock());
+    }
+    const imagesBlock = formatImagesBlock(params.images);
+    if (imagesBlock) {
+        fragments.push(imagesBlock);
     }
 
     const scopeLabel = params.scope?.label || params.actor?.scopeId || '';

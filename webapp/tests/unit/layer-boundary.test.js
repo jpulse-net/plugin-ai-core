@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Layer Boundary
  * @tagline         Tools and agent import only downward
  * @file            plugins/ai-core/webapp/tests/unit/layer-boundary.test.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -44,6 +44,21 @@ describe('ai-core layer boundary', () => {
         for (const file of files) {
             for (const spec of importSpecs(file)) {
                 if (spec.includes('/agent/') || spec.includes('../agent') || spec.includes('/transport/') || spec.includes('../transport')) {
+                    leaks.push(`${path.relative(webapp, file)} -> ${spec}`);
+                }
+            }
+        }
+        expect(leaks).toEqual([]);
+    });
+
+    test('attachments does not import agent, transport, or a provider', () => {
+        const files = collectJs(path.join(webapp, 'utils/attachments'));
+        const leaks = [];
+        for (const file of files) {
+            for (const spec of importSpecs(file)) {
+                if (spec.includes('/agent/') || spec.includes('../agent')
+                    || spec.includes('/transport/') || spec.includes('../transport')
+                    || spec.includes('ai-anthropic') || spec.includes('ai-mock')) {
                     leaks.push(`${path.relative(webapp, file)} -> ${spec}`);
                 }
             }

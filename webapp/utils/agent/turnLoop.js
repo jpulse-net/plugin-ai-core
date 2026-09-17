@@ -3,7 +3,7 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,10 +12,11 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
-import { createBudgetState, executeTool, resolveTools } from '../tools/index.js';
+import { createBudgetState, executeTool, resolveTools, stripMedia } from '../tools/index.js';
 import { onBehalfOfLogSuffix, threadOwner } from '../tools/actor.js';
 import { broadcastCancel, clearCancel, isCancelRequested } from './cancel.js';
 import { acquireLease, releaseLease } from './lease.js';
+import { followFromResult, openUserContent, refsForTurn, turnExtras } from './inputs.js';
 import { assemblePrompt, historyToMessages } from './prompt.js';
 import {
     chooseProviderModel,
@@ -237,13 +238,15 @@ export async function runTurn(params) {
             model: chosen.model,
             createdBy: threadOwner(actor),
             onBehalfOf: actor.onBehalfOf,
-            now
+            now,
+            ...refsForTurn(params)
         });
 
         const history = await turnModel.listByThread(thread._id, 40);
         const prior = history.filter(row => String(row._id) !== String(turn._id));
         const messages = historyToMessages(prior, settings.maxContextChars);
-        messages.push({ role: 'user', content: params.userText || '' });
+        const userContent = await openUserContent(params, settings, chosen);
+        messages.push({ role: 'user', content: userContent });
 
         sink({ type: 'turn_start', turnId: String(turn._id), threadId: String(thread._id) });
 
@@ -259,10 +262,13 @@ export async function runTurn(params) {
                 break;
             }
 
+            const extras = turnExtras(params);
             const resolved = await resolveTools(actor, {
                 hookManager,
                 policy: settings.policy,
-                scope: params.scope
+                settings,
+                scope: params.scope,
+                ...extras.resolve
             });
             const prompt = await assemblePrompt({
                 actor,
@@ -272,7 +278,8 @@ export async function runTurn(params) {
                 siteInstructions: settings.siteInstructions,
                 context: params.context,
                 target: params.target,
-                hookManager
+                hookManager,
+                ...extras.prompt
             });
             if (settings.debugDumps) {
                 logLine(req, 'aiCore.runTurn', formatPromptDebugLine(
@@ -386,6 +393,7 @@ export async function runTurn(params) {
 
             if (toolUse && Array.isArray(toolUse.calls) && toolUse.calls.length) {
                 const results = [];
+                const extras = [];
                 let stalled = false;
                 for (const call of toolUse.calls) {
                     if (stalled) {
@@ -416,8 +424,13 @@ export async function runTurn(params) {
                         moduleDataCache
                     });
                     usage.toolCalls += 1;
-                    results.push({ id: call.id, name: call.name, args: call.args || {}, result });
-                    sink({ type: 'tool_result', id: call.id, name: call.name, result });
+                    const extra = followFromResult(result);
+                    if (extra) {
+                        extras.push(extra);
+                    }
+                    const stored = stripMedia(result);
+                    results.push({ id: call.id, name: call.name, args: call.args || {}, result: stored });
+                    sink({ type: 'tool_result', id: call.id, name: call.name, result: stored });
                     if (result.stall) {
                         stalled = true;
                         status = 'stalled';
@@ -443,6 +456,9 @@ export async function runTurn(params) {
                             summary: row.result.summary
                         }
                     });
+                });
+                extras.forEach((row) => {
+                    messages.push(row);
                 });
                 if (stalled) {
                     stop = true;

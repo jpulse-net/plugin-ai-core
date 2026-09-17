@@ -3,7 +3,7 @@
  * @tagline         Effective AI settings
  * @description     Site config tab, optional app.conf.ai, and plugin debug flag
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -33,7 +33,26 @@ export const AI_CONFIG_DEFAULTS = {
     retentionDays: 90,
     autoTitle: true,
     siteInstructions: '',
-    proposalClaimPhrases: DEFAULT_CLAIM_PHRASES.slice()
+    proposalClaimPhrases: DEFAULT_CLAIM_PHRASES.slice(),
+    sourcesEnabled: true,
+    sourceMimeTypes: ['text/plain', 'text/markdown', 'text/csv', 'text/html'],
+    maxSourcesPerConversation: 5,
+    maxSourceChars: 1000000,
+    maxTotalSourceChars: 2000000,
+    maxSourceReadChars: 24000,
+    maxSourceReadsPerTurn: 8,
+    urlIngestEnabled: true,
+    urlMaxBytes: 5242880,
+    urlTimeoutMs: 15000,
+    urlAllowedHosts: [],
+    urlBlockedHosts: [],
+    maxConvertPages: 100,
+    convertTimeoutMs: 30000,
+    imagesEnabled: true,
+    imageMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+    maxImageBytes: 4194304,
+    maxImageEdge: 2048,
+    imageStageTtlSec: 300
 };
 
 function asArray(value) {
@@ -120,7 +139,51 @@ export function mergeSettings(sources = {}) {
         debugDumps: plugin.debugDumps === true || app.debugDumps === true,
         maxSourceReadsPerTurn: Number.isFinite(site.maxSourceReadsPerTurn)
             ? site.maxSourceReadsPerTurn
-            : 8,
+            : AI_CONFIG_DEFAULTS.maxSourceReadsPerTurn,
+        sourcesEnabled: site.sourcesEnabled !== false,
+        sourceMimeTypes: asArray(site.sourceMimeTypes).length
+            ? asArray(site.sourceMimeTypes)
+            : AI_CONFIG_DEFAULTS.sourceMimeTypes.slice(),
+        maxSourcesPerConversation: Number.isFinite(site.maxSourcesPerConversation)
+            ? site.maxSourcesPerConversation
+            : AI_CONFIG_DEFAULTS.maxSourcesPerConversation,
+        maxSourceChars: Number.isFinite(site.maxSourceChars)
+            ? site.maxSourceChars
+            : AI_CONFIG_DEFAULTS.maxSourceChars,
+        maxTotalSourceChars: Number.isFinite(site.maxTotalSourceChars)
+            ? site.maxTotalSourceChars
+            : AI_CONFIG_DEFAULTS.maxTotalSourceChars,
+        maxSourceReadChars: Number.isFinite(site.maxSourceReadChars)
+            ? site.maxSourceReadChars
+            : AI_CONFIG_DEFAULTS.maxSourceReadChars,
+        urlIngestEnabled: site.urlIngestEnabled !== false,
+        urlMaxBytes: Number.isFinite(site.urlMaxBytes)
+            ? site.urlMaxBytes
+            : AI_CONFIG_DEFAULTS.urlMaxBytes,
+        urlTimeoutMs: Number.isFinite(site.urlTimeoutMs)
+            ? site.urlTimeoutMs
+            : AI_CONFIG_DEFAULTS.urlTimeoutMs,
+        urlAllowedHosts: asArray(site.urlAllowedHosts),
+        urlBlockedHosts: asArray(site.urlBlockedHosts),
+        maxConvertPages: Number.isFinite(site.maxConvertPages)
+            ? site.maxConvertPages
+            : AI_CONFIG_DEFAULTS.maxConvertPages,
+        convertTimeoutMs: Number.isFinite(site.convertTimeoutMs)
+            ? site.convertTimeoutMs
+            : AI_CONFIG_DEFAULTS.convertTimeoutMs,
+        imagesEnabled: site.imagesEnabled !== false,
+        imageMimeTypes: asArray(site.imageMimeTypes).length
+            ? asArray(site.imageMimeTypes)
+            : AI_CONFIG_DEFAULTS.imageMimeTypes.slice(),
+        maxImageBytes: Number.isFinite(site.maxImageBytes)
+            ? site.maxImageBytes
+            : AI_CONFIG_DEFAULTS.maxImageBytes,
+        maxImageEdge: Number.isFinite(site.maxImageEdge)
+            ? site.maxImageEdge
+            : AI_CONFIG_DEFAULTS.maxImageEdge,
+        imageStageTtlSec: Number.isFinite(site.imageStageTtlSec)
+            ? site.imageStageTtlSec
+            : AI_CONFIG_DEFAULTS.imageStageTtlSec,
         proposalClaimPhrases: asLines(site.proposalClaimPhrases).length
             ? asLines(site.proposalClaimPhrases)
             : DEFAULT_CLAIM_PHRASES.slice()

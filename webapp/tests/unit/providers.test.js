@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Providers
  * @tagline         configured filter, pair choice, vision gate
  * @file            plugins/ai-core/webapp/tests/unit/providers.test.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -183,11 +183,18 @@ describe('pairOnMenu', () => {
 });
 
 describe('ai-mock descriptor', () => {
-    test('registers configured true', async () => {
+    test('registers configured true and a vision row', async () => {
         const ctx = { providers: [] };
         await AiMockController.onAiProviderRegister(ctx);
         expect(ctx.providers[0].configured).toBe(true);
         expect(ctx.providers[0].plugin).toBe('ai-mock');
+        const vision = ctx.providers[0].models.find((row) => row.id === 'mock-vision');
+        expect(vision.capabilities.vision).toBe(true);
+        const menu = filterAllowedModels([normalizeProvider(ctx.providers[0])], {});
+        const echo = menu.find((row) => row.model === 'mock-echo');
+        const seen = menu.find((row) => row.model === 'mock-vision');
+        expect(echo.capabilities.vision).toBe(false);
+        expect(seen.capabilities.vision).toBe(true);
     });
 });
 

@@ -3,7 +3,7 @@
  * @tagline         Per-thread AI namespace and client-host bridge
  * @description     Authorize the handshake, start turns on the socket, call the origin tab
  * @file            plugins/ai-core/webapp/utils/transport/ws.js
- * @version         1.0.3
+ * @version         1.0.4
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -25,6 +25,7 @@ import {
     RESULT_SIZE_CAP,
     threadOwner
 } from '../tools/index.js';
+import { sanitizeImageMeta, sanitizeSourceMeta } from '../attachments/stream.js';
 
 export const AI_WS_PATTERN = '/api/1/ws/ai/:threadId';
 export const AI_WS_MAX_SIZE = RESULT_SIZE_CAP;
@@ -210,6 +211,8 @@ export function registerAiNamespace(deps = {}) {
                 context: data.context,
                 target: data.target,
                 script: data.script,
+                sources: sanitizeSourceMeta(data.sources),
+                images: sanitizeImageMeta(data.images),
                 threadModel,
                 turnModel: deps.turnModel || AiTurnModel,
                 usageModel: deps.usageModel || AiUsageModel,
