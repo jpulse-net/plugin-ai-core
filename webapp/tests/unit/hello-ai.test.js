@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Isolation, write path, mock sequence, adapter scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.4
+ * @version         1.0.5
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -22,7 +22,7 @@ import AiMockController, {
 } from '../../../../ai-mock/webapp/controller/aiMock.js';
 import { chooseTransport } from '../../utils/transport/index.js';
 import { historyToMessages } from '../../utils/agent/prompt.js';
-import { filterSlashCommands, parseSlashCommand } from '../../utils/panel/slash.js';
+import { filterSlashCommands, normalizeCatalog, parseSlashCommand } from '../../utils/panel/slash.js';
 import {
     AI_BUDGET_EXCEEDED,
     AI_CAPABILITY_DENIED,
@@ -260,26 +260,30 @@ describe('mock vision reply', () => {
 });
 
 describe('slash catalog', () => {
-    test('five commands resolve locally and //help is literal', () => {
-        expect(parseSlashCommand('/help').name).toBe('help');
-        expect(parseSlashCommand('/tools').name).toBe('tools');
-        expect(parseSlashCommand('/model ai-mock/mock-echo')).toEqual({
+    test('core commands resolve locally and //help is literal', () => {
+        const catalog = normalizeCatalog();
+        expect(parseSlashCommand('/help', catalog).name).toBe('help');
+        expect(parseSlashCommand('/tools', catalog).name).toBe('tools');
+        expect(parseSlashCommand('/model ai-mock/mock-echo', catalog)).toEqual({
             kind: 'command',
             name: 'model',
             arg: 'ai-mock/mock-echo'
         });
-        expect(parseSlashCommand('/new').name).toBe('new');
-        expect(parseSlashCommand('/cancel').name).toBe('cancel');
-        expect(parseSlashCommand('//help')).toEqual({ kind: 'literal', text: '/help' });
-        expect(parseSlashCommand('hello')).toBeNull();
+        expect(parseSlashCommand('/new', catalog).name).toBe('new');
+        expect(parseSlashCommand('/cancel', catalog).name).toBe('cancel');
+        expect(parseSlashCommand('//help', catalog)).toEqual({ kind: 'literal', text: '/help' });
+        expect(parseSlashCommand('hello', catalog)).toBeNull();
     });
 
     test('slash picker matches the typed prefix and ignores literals', () => {
-        expect(filterSlashCommands('/')).toEqual(['help', 'tools', 'model', 'new', 'cancel']);
-        expect(filterSlashCommands('/he')).toEqual(['help']);
-        expect(filterSlashCommands('/model ai-mock/mock-echo')).toEqual(['model']);
-        expect(filterSlashCommands('//help')).toEqual([]);
-        expect(filterSlashCommands('help')).toEqual([]);
+        const catalog = normalizeCatalog();
+        expect(filterSlashCommands('/', catalog, {}).map((row) => row.name)).toEqual([
+            'help', 'tools', 'model', 'new', 'cancel', 'conversations', 'status'
+        ]);
+        expect(filterSlashCommands('/he', catalog, {}).map((row) => row.name)).toEqual(['help']);
+        expect(filterSlashCommands('/model ai-mock/mock-echo', catalog, {}).map((row) => row.name)).toEqual(['model']);
+        expect(filterSlashCommands('//help', catalog, {})).toEqual([]);
+        expect(filterSlashCommands('help', catalog, {})).toEqual([]);
     });
 
     test('history skips user-only turns so they do not poison the next request', () => {
@@ -309,9 +313,12 @@ describe('adapter contract scan', () => {
             }
         }
         expect(leaks).toEqual([]);
+        const hello = fs.readFileSync(files[1], 'utf8');
+        expect(hello).not.toMatch(/describeScope/);
+        const panel = fs.readFileSync(files[0], 'utf8');
+        expect(panel).not.toMatch(/const SLASH_COMMANDS = \['help'/);
         const stub = {
             toolData() { return {}; },
-            describeScope() { return 'scope'; },
             describeContext() { return 'context'; },
             describeTarget() { return 'target'; },
             executeTool() { return { ok: true }; },
@@ -322,7 +329,6 @@ describe('adapter contract scan', () => {
         expect(Object.keys(stub).sort()).toEqual([
             'applyProposal',
             'describeContext',
-            'describeScope',
             'describeTarget',
             'executeTool',
             'renderProposalPreview',

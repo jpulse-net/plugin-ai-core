@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.4
+ * @version         1.0.5
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -48,12 +48,37 @@ if (!window.jPulse) {
         slashModel: '{{i18n.view.ui.ai.slash.model}}',
         slashNew: '{{i18n.view.ui.ai.slash.new}}',
         slashCancel: '{{i18n.view.ui.ai.slash.cancel}}',
+        slashConversations: '{{i18n.view.ui.ai.slash.conversations}}',
+        slashQuota: '{{i18n.view.ui.ai.slash.quota}}',
+        slashSources: '{{i18n.view.ui.ai.slash.sources}}',
+        slashStatus: '{{i18n.view.ui.ai.slash.status}}',
+        slashContext: '{{i18n.view.ui.ai.slash.context}}',
         slashHost: '{{i18n.view.ui.ai.slash.host}}',
         slashWithheld: '{{i18n.view.ui.ai.slash.withheld}}',
         slashReason: '{{i18n.view.ui.ai.slash.reason}}',
         slashNone: '{{i18n.view.ui.ai.slash.none}}',
         slashUnknown: '{{i18n.view.ui.ai.slash.unknown}}',
         slashExamples: '{{i18n.view.ui.ai.slash.examples}}',
+        slashCancelIdle: '{{i18n.view.ui.ai.slash.cancelIdle}}',
+        slashConversationsNone: '{{i18n.view.ui.ai.slash.conversationsNone}}',
+        slashConversationsOpened: '{{i18n.view.ui.ai.slash.conversationsOpened}}',
+        slashConversationsBad: '{{i18n.view.ui.ai.slash.conversationsBad}}',
+        slashQuotaNone: '{{i18n.view.ui.ai.slash.quotaNone}}',
+        slashCostUnknown: '{{i18n.view.ui.ai.slash.costUnknown}}',
+        slashSourcesNone: '{{i18n.view.ui.ai.slash.sourcesNone}}',
+        slashSourcesCap: '{{i18n.view.ui.ai.slash.sourcesCap}}',
+        slashStatusTransport: '{{i18n.view.ui.ai.slash.statusTransport}}',
+        slashStatusThread: '{{i18n.view.ui.ai.slash.statusThread}}',
+        slashStatusModel: '{{i18n.view.ui.ai.slash.statusModel}}',
+        slashStatusChats: '{{i18n.view.ui.ai.slash.statusChats}}',
+        slashStatusTurns: '{{i18n.view.ui.ai.slash.statusTurns}}',
+        slashStatusRunning: '{{i18n.view.ui.ai.slash.statusRunning}}',
+        slashStatusIdle: '{{i18n.view.ui.ai.slash.statusIdle}}',
+        slashContextCurrent: '{{i18n.view.ui.ai.slash.contextCurrent}}',
+        slashContextTarget: '{{i18n.view.ui.ai.slash.contextTarget}}',
+        slashContextOptions: '{{i18n.view.ui.ai.slash.contextOptions}}',
+        slashContextUnavailable: '{{i18n.view.ui.ai.slash.contextUnavailable}}',
+        contextLabel: '{{i18n.view.ui.ai.panel.contextLabel}}',
         cardApply: '{{i18n.view.ui.ai.card.apply}}',
         cardUndo: '{{i18n.view.ui.ai.card.undo}}',
         cardApplyAll: '{{i18n.view.ui.ai.card.applyAll}}',
@@ -85,7 +110,7 @@ if (!window.jPulse) {
         usedSources: '{{i18n.view.ui.ai.attach.usedSources}}'
     };
     const PANEL_TOOLS = { list_sources: true, get_source: true };
-    const SLASH_COMMANDS = ['help', 'tools', 'model', 'new', 'cancel'];
+    const REGION_ANCHORS = ['header', 'transcriptTop', 'transcriptBottom', 'composeAbove', 'composeBelow'];
     const RESULT_SIZE_CAP = 256 * 1024;
     const loadedModules = new Map();
     let markedPromise = null;
@@ -131,7 +156,145 @@ if (!window.jPulse) {
                 .replace(/"/g, '&quot;');
     }
 
-    function parseSlashCommand(text) {
+    function whenQuota(ctx) {
+        const rows = ctx && ctx.capability && ctx.capability.quota && ctx.capability.quota.rows;
+        return Array.isArray(rows) && rows.length > 0;
+    }
+
+    function whenSources(ctx) {
+        const cap = ctx && ctx.capability;
+        if (!cap) {
+            return false;
+        }
+        return cap.sourcesEnabled !== false || cap.imagesEnabled !== false;
+    }
+
+    function whenContext(ctx) {
+        return !!(ctx && ctx.adapter && typeof ctx.adapter.contextOptions === 'function');
+    }
+
+    const DEFAULT_COMMANDS = [
+        { name: 'help' },
+        { name: 'tools' },
+        { name: 'model' },
+        { name: 'new', aliases: ['clear'] },
+        { name: 'cancel' },
+        { name: 'conversations', aliases: ['resume'] },
+        { name: 'quota', when: whenQuota },
+        { name: 'sources', when: whenSources },
+        { name: 'status' },
+        { name: 'context', when: whenContext }
+    ];
+    const COMMAND_DEFAULTS = DEFAULT_COMMANDS.map((row) => row.name);
+
+    function slashName(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function isCommandName(name) {
+        return /^[a-z]+$/.test(name);
+    }
+
+    function cloneCommand(row) {
+        return {
+            name: row.name,
+            aliases: Array.isArray(row.aliases) ? row.aliases.map(slashName).filter(isCommandName) : [],
+            hint: row.hint,
+            when: typeof row.when === 'function' ? row.when : null,
+            hidden: !!row.hidden,
+            run: typeof row.run === 'function' ? row.run : null
+        };
+    }
+
+    function normalizeCatalog(list, builtins) {
+        const source = builtins || DEFAULT_COMMANDS;
+        const built = new Map();
+        source.forEach((row) => {
+            if (row && row.name) {
+                built.set(slashName(row.name), row);
+            }
+        });
+        const names = list == null ? source.map((row) => row.name) : list;
+        const byName = new Map();
+        (Array.isArray(names) ? names : []).forEach((entry) => {
+            if (typeof entry === 'string') {
+                const name = slashName(entry);
+                if (!isCommandName(name)) {
+                    return;
+                }
+                const found = built.get(name);
+                if (found) {
+                    byName.set(name, cloneCommand(found));
+                }
+                return;
+            }
+            if (!entry || typeof entry !== 'object' || !entry.name) {
+                return;
+            }
+            const name = slashName(entry.name);
+            if (!isCommandName(name)) {
+                return;
+            }
+            const found = built.get(name);
+            const merged = cloneCommand(found || { name: name });
+            if (Array.isArray(entry.aliases)) {
+                merged.aliases = entry.aliases.map(slashName).filter(isCommandName);
+            }
+            if (entry.hint != null) {
+                merged.hint = entry.hint;
+            }
+            if (typeof entry.when === 'function') {
+                merged.when = entry.when;
+            }
+            if (entry.hidden != null) {
+                merged.hidden = !!entry.hidden;
+            }
+            if (typeof entry.run === 'function') {
+                merged.run = entry.run;
+            }
+            merged.name = name;
+            byName.set(name, merged);
+        });
+        return Array.from(byName.values());
+    }
+
+    function commandAvailable(cmd, ctx) {
+        if (!cmd || typeof cmd.when !== 'function') {
+            return true;
+        }
+        try {
+            return cmd.when(ctx || {}) !== false;
+        } catch (_err) {
+            return false;
+        }
+    }
+
+    function commandAliases(cmd) {
+        return Array.isArray(cmd && cmd.aliases) ? cmd.aliases : [];
+    }
+
+    function lookupCommand(catalog, token) {
+        const name = slashName(token);
+        for (let i = 0; i < catalog.length; i += 1) {
+            const cmd = catalog[i];
+            if (cmd.name === name || commandAliases(cmd).indexOf(name) >= 0) {
+                return cmd;
+            }
+        }
+        return null;
+    }
+
+    function matchesPrefix(cmd, typed) {
+        if (!typed) {
+            return true;
+        }
+        if (cmd.name.indexOf(typed) === 0) {
+            return true;
+        }
+        return commandAliases(cmd).some((alias) => alias.indexOf(typed) === 0);
+    }
+
+    function parseSlashCommand(text, catalog, ctx) {
         const raw = String(text || '');
         if (raw.startsWith('//')) {
             return { kind: 'literal', text: raw.slice(1) };
@@ -140,14 +303,19 @@ if (!window.jPulse) {
         if (!match) {
             return null;
         }
-        const name = match[1].toLowerCase();
-        if (SLASH_COMMANDS.indexOf(name) < 0) {
+        const list = Array.isArray(catalog) ? catalog : normalizeCatalog();
+        const cmd = lookupCommand(list, match[1]);
+        if (!cmd || !commandAvailable(cmd, ctx)) {
             return null;
         }
-        return { kind: 'command', name: name, arg: (match[2] || '').trim() };
+        return {
+            kind: 'command',
+            name: cmd.name,
+            arg: (match[2] || '').trim()
+        };
     }
 
-    function filterSlashCommands(text) {
+    function filterSlashCommands(text, catalog, ctx) {
         const raw = String(text || '');
         if (!raw.startsWith('/') || raw.startsWith('//')) {
             return [];
@@ -155,7 +323,99 @@ if (!window.jPulse) {
         const rest = raw.slice(1);
         const space = rest.search(/\s/);
         const typed = (space < 0 ? rest : rest.slice(0, space)).toLowerCase();
-        return SLASH_COMMANDS.filter((name) => name.startsWith(typed));
+        const list = Array.isArray(catalog) ? catalog : normalizeCatalog();
+        return list.filter((cmd) => {
+            if (cmd.hidden || !commandAvailable(cmd, ctx)) {
+                return false;
+            }
+            return matchesPrefix(cmd, typed);
+        });
+    }
+
+    function fillToken(template, token, value) {
+        return String(template || '').split(token).join(String(value == null ? '' : value));
+    }
+
+    function parseExampleRow(row) {
+        const raw = String(row == null ? '' : row);
+        if (!raw.trim()) {
+            return null;
+        }
+        const parts = [];
+        const pattern = /\[\[([^\]]+)\]\]/g;
+        let last = 0;
+        let match = pattern.exec(raw);
+        while (match) {
+            if (match.index > last) {
+                parts.push({ type: 'text', text: raw.slice(last, match.index) });
+            }
+            const label = match[1].trim();
+            if (label) {
+                parts.push({ type: 'link', text: label, prompt: label });
+            }
+            last = match.index + match[0].length;
+            match = pattern.exec(raw);
+        }
+        if (last === 0) {
+            return { parts: [{ type: 'text', text: raw }] };
+        }
+        if (last < raw.length) {
+            parts.push({ type: 'text', text: raw.slice(last) });
+        }
+        return { parts };
+    }
+
+    function unknownAnchorMessage(anchor) {
+        return `Unknown region anchor "${anchor}". Valid anchors: ${REGION_ANCHORS.join(', ')}`;
+    }
+
+    function normalizeRegion(region) {
+        if (!region || typeof region !== 'object' || !region.name) {
+            throw new Error('A region needs a name');
+        }
+        const anchor = String(region.anchor || '');
+        if (REGION_ANCHORS.indexOf(anchor) < 0) {
+            throw new Error(unknownAnchorMessage(anchor));
+        }
+        const priority = Number(region.priority);
+        return {
+            name: String(region.name),
+            anchor: anchor,
+            priority: Number.isFinite(priority) ? priority : 100,
+            render: typeof region.render === 'function' ? region.render : null,
+            on: Array.isArray(region.on) ? region.on.slice() : []
+        };
+    }
+
+    function mergeRegions(list) {
+        const byName = new Map();
+        (Array.isArray(list) ? list : []).forEach((row) => {
+            const region = normalizeRegion(row);
+            byName.set(region.name, region);
+        });
+        const ordered = Array.from(byName.values());
+        ordered.sort((a, b) => {
+            const ai = REGION_ANCHORS.indexOf(a.anchor);
+            const bi = REGION_ANCHORS.indexOf(b.anchor);
+            if (ai !== bi) {
+                return ai - bi;
+            }
+            if (a.priority !== b.priority) {
+                return a.priority - b.priority;
+            }
+            return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+        });
+        return ordered;
+    }
+
+    function normalizeRegionContent(out) {
+        if (out == null) {
+            return { hide: true };
+        }
+        if (out && typeof out === 'object' && out.nodeType) {
+            return { hide: false, node: out };
+        }
+        return { hide: false, text: String(out) };
     }
 
     function parseModelArg(arg) {
@@ -507,6 +767,8 @@ if (!window.jPulse) {
         const scopeType = options.scopeType || '';
         const scopeId = String(options.scopeId || '');
         const adapter = options.adapter || {};
+        const catalog = normalizeCatalog(options.commands);
+        const siteRegions = mergeRegions(options.regions);
         const panelId = options.id || `ai-panel-${scopeType}-${scopeId}`;
         const threadKey = `jp:ai:thread:${scopeType}:${scopeId}`;
         const panelStore = { sources: [], images: [], files: new Map(), caps: {} };
@@ -542,11 +804,16 @@ if (!window.jPulse) {
             '    <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M8 3v10M3 8h10"/></svg>',
             '  </button>',
             '</div>',
+            '<div class="plg-ai-anchor" data-anchor="header"></div>',
             '<div class="plg-ai-notice" hidden></div>',
+            '<div class="plg-ai-anchor" data-anchor="transcriptTop"></div>',
             '<div class="plg-ai-messages"></div>',
+            '<div class="plg-ai-anchor" data-anchor="transcriptBottom"></div>',
             '<div class="plg-ai-compose">',
             '  <div class="plg-ai-slash" hidden></div>',
             '  <div class="plg-ai-intercept" hidden></div>',
+            '  <div class="plg-ai-anchor" data-anchor="composeAbove"></div>',
+            `  <div class="plg-ai-context" hidden><label class="plg-ai-context-label">${escapeHtml(I18N.contextLabel)}</label><select class="plg-ai-context-select jp-form-select" aria-label="${escapeHtml(I18N.contextLabel)}"></select></div>`,
             '  <div class="plg-ai-strip" hidden>',
             '    <div class="plg-ai-strip-chips"></div>',
             '    <div class="plg-ai-strip-add">',
@@ -568,6 +835,7 @@ if (!window.jPulse) {
             `      <button type="button" class="plg-ai-cancel jp-btn" hidden>${escapeHtml(I18N.cancel)}</button>`,
             '    </div>',
             '  </div>',
+            '  <div class="plg-ai-anchor" data-anchor="composeBelow"></div>',
             '</div>'
         ].join('');
 
@@ -620,13 +888,16 @@ if (!window.jPulse) {
             sources: [],
             images: [],
             intercept: null,
-            openChip: ''
+            openChip: '',
+            contextValue: ''
         };
 
         const els = {
             messages: root.querySelector('.plg-ai-messages'),
             notice: root.querySelector('.plg-ai-notice'),
             slash: root.querySelector('.plg-ai-slash'),
+            context: root.querySelector('.plg-ai-context'),
+            contextSelect: root.querySelector('.plg-ai-context-select'),
             intercept: root.querySelector('.plg-ai-intercept'),
             strip: root.querySelector('.plg-ai-strip'),
             chips: root.querySelector('.plg-ai-strip-chips'),
@@ -664,6 +935,177 @@ if (!window.jPulse) {
                 requestAnimationFrame(scrollMessagesToEnd);
             });
         };
+
+        function commandCtx(extra) {
+            const ctx = {
+                capability: state.capability,
+                adapter: adapter,
+                thread: currentThread(),
+                handle: handle,
+                name: extra && extra.name || '',
+                arg: extra && extra.arg || ''
+            };
+            ctx.framework = function () {
+                const fn = FRAMEWORK_RUNNERS[ctx.name];
+                return fn ? fn({ name: ctx.name, arg: ctx.arg }) : null;
+            };
+            return ctx;
+        }
+
+        function slashHint(cmd) {
+            if (cmd && cmd.hint) {
+                return String(cmd.hint);
+            }
+            const hints = {
+                help: I18N.slashHelp,
+                tools: I18N.slashTools,
+                model: I18N.slashModel,
+                new: I18N.slashNew,
+                cancel: I18N.slashCancel,
+                conversations: I18N.slashConversations,
+                quota: I18N.slashQuota,
+                sources: I18N.slashSources,
+                status: I18N.slashStatus,
+                context: I18N.slashContext
+            };
+            return hints[cmd && cmd.name] || '';
+        }
+
+        function hasContextOptions() {
+            return typeof adapter.contextOptions === 'function';
+        }
+
+        function readContextOptions() {
+            if (!hasContextOptions()) {
+                return [];
+            }
+            const rows = adapter.contextOptions() || [];
+            return (Array.isArray(rows) ? rows : []).map((row) => {
+                return {
+                    value: String(row && row.value != null ? row.value : ''),
+                    label: String(row && row.label != null ? row.label : (row && row.value) || ''),
+                    unavailable: !!(row && row.unavailable)
+                };
+            }).filter((row) => row.value);
+        }
+
+        function contextStorageKey() {
+            return `jp:ai:context:${scopeType}:${scopeId}:${state.threadId || 'none'}`;
+        }
+
+        function contextGet() {
+            return state.contextValue || '';
+        }
+
+        function firstAvailableContext(rows) {
+            const available = rows.find((row) => !row.unavailable);
+            return available ? available.value : (rows[0] && rows[0].value) || '';
+        }
+
+        function contextSet(value, persist) {
+            const rows = readContextOptions();
+            const match = rows.find((row) => row.value === String(value));
+            state.contextValue = match ? match.value : firstAvailableContext(rows);
+            if (persist !== false && state.threadId) {
+                localStorage.setItem(contextStorageKey(), state.contextValue);
+            }
+            renderContextRow();
+        }
+
+        function loadThreadContext() {
+            if (!hasContextOptions()) {
+                state.contextValue = '';
+                renderContextRow();
+                return;
+            }
+            const rows = readContextOptions();
+            const stored = state.threadId ? localStorage.getItem(contextStorageKey()) : '';
+            const match = rows.find((row) => row.value === stored);
+            state.contextValue = match ? match.value : firstAvailableContext(rows);
+            renderContextRow();
+        }
+
+        function renderContextRow() {
+            if (!els.context || !els.contextSelect) {
+                return;
+            }
+            if (!hasContextOptions()) {
+                els.context.hidden = true;
+                els.contextSelect.innerHTML = '';
+                return;
+            }
+            const rows = readContextOptions();
+            els.context.hidden = rows.length === 0;
+            els.contextSelect.innerHTML = rows.map((row) => {
+                const label = row.unavailable
+                    ? `${row.label} (${I18N.slashContextUnavailable})`
+                    : row.label;
+                const selected = row.value === state.contextValue ? ' selected' : '';
+                return `<option value="${escapeHtml(row.value)}"${selected}>${escapeHtml(label)}</option>`;
+            }).join('');
+        }
+
+        function regionRenderCtx() {
+            return {
+                thread: currentThread(),
+                capability: state.capability,
+                adapter: adapter,
+                handle: handle,
+                sources: state.sources.slice(),
+                images: state.images.slice()
+            };
+        }
+
+        function renderOneRegion(region) {
+            const host = root.querySelector(`.plg-ai-anchor[data-anchor="${region.anchor}"]`);
+            if (!host) {
+                return;
+            }
+            let wrap = host.querySelector(`[data-region="${region.name}"]`);
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.className = 'plg-ai-region';
+                wrap.setAttribute('data-region', region.name);
+                host.appendChild(wrap);
+            }
+            let out = null;
+            if (typeof region.render === 'function') {
+                try {
+                    out = region.render(regionRenderCtx());
+                } catch (_err) {
+                    out = null;
+                }
+            }
+            const normalized = normalizeRegionContent(out);
+            wrap.textContent = '';
+            if (normalized.hide) {
+                wrap.hidden = true;
+                return;
+            }
+            wrap.hidden = false;
+            if (normalized.node) {
+                wrap.appendChild(normalized.node);
+                return;
+            }
+            wrap.textContent = normalized.text;
+        }
+
+        function refreshRegions(name) {
+            const list = name
+                ? siteRegions.filter((row) => row.name === name)
+                : siteRegions;
+            list.forEach(renderOneRegion);
+            pinMessages();
+        }
+
+        function emitRegionEvent(event) {
+            siteRegions.forEach((region) => {
+                if ((region.on || []).indexOf(event) >= 0) {
+                    renderOneRegion(region);
+                }
+            });
+            pinMessages();
+        }
 
         function showNotice(text, visible) {
             els.notice.hidden = !visible;
@@ -887,6 +1329,7 @@ if (!window.jPulse) {
             if (els.addUrl) {
                 els.addUrl.hidden = cap.urlIngestEnabled === false || cap.sourcesEnabled === false;
             }
+            emitRegionEvent('sources');
         }
 
         async function refreshCapability() {
@@ -898,6 +1341,7 @@ if (!window.jPulse) {
             state.capability = capability;
             syncStore();
             renderStrip();
+            emitRegionEvent('capability');
             return capability;
         }
 
@@ -1395,11 +1839,16 @@ if (!window.jPulse) {
                 }
                 return a.seq - b.seq;
             });
+            state.locals.forEach((local) => {
+                if (local.agentNode && local.agentNode.parentNode) {
+                    local.agentNode.parentNode.removeChild(local.agentNode);
+                }
+            });
             const html = [];
             for (const item of items) {
                 if (item.kind === 'local') {
                     html.push(`<article class="plg-ai-turn plg-ai-turn--local"><div class="plg-ai-user">${escapeHtml(item.local.userText || '')}</div>`);
-                    html.push(`<div class="plg-ai-agent">${renderPlain(item.local.agentText)}</div></article>`);
+                    html.push(`<div class="plg-ai-agent" data-ai-local="${item.seq}"></div></article>`);
                     continue;
                 }
                 html.push(await renderTurnHtml(item.turn));
@@ -1421,6 +1870,17 @@ if (!window.jPulse) {
                 html.push('</article>');
             }
             els.messages.innerHTML = html.join('');
+            state.locals.forEach((local, idx) => {
+                const box = els.messages.querySelector(`[data-ai-local="${idx}"]`);
+                if (!box) {
+                    return;
+                }
+                if (local.agentNode) {
+                    box.appendChild(local.agentNode);
+                    return;
+                }
+                box.innerHTML = renderPlain(local.agentText);
+            });
             pinCopyButtons(els.messages);
             hydrateCardPreviews();
             pinMessages();
@@ -1446,6 +1906,8 @@ if (!window.jPulse) {
                 applyThreadModel(null);
                 await renderTurns();
                 renderThreads();
+                loadThreadContext();
+                emitRegionEvent('thread');
                 return;
             }
             const res = await jPulse.api.get(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/turns`);
@@ -1462,6 +1924,8 @@ if (!window.jPulse) {
             }
             await renderTurns();
             renderThreads();
+            loadThreadContext();
+            emitRegionEvent('thread');
         }
 
         async function ensureThread() {
@@ -1481,24 +1945,72 @@ if (!window.jPulse) {
             return state.threadId;
         }
 
-        function slashHelpLines() {
-            const lines = [
-                `/help — ${I18N.slashHelp}`,
-                `/tools — ${I18N.slashTools}`,
-                `/model — ${I18N.slashModel}`,
-                `/new — ${I18N.slashNew}`,
-                `/cancel — ${I18N.slashCancel}`
-            ];
-            const examples = Array.isArray(options.examples) ? options.examples : [];
-            if (examples.length) {
-                lines.push('', I18N.slashExamples);
-                examples.forEach((row) => {
-                    if (row) {
-                        lines.push(String('- ' + row));
-                    }
-                });
+        function visibleCatalog() {
+            return catalog.filter((cmd) => !cmd.hidden && commandAvailable(cmd, commandCtx()));
+        }
+
+        function fillCompose(text) {
+            els.input.value = String(text || '');
+            els.input.focus();
+        }
+
+        function appendLinkedRow(parent, row) {
+            const parsed = parseExampleRow(row);
+            if (!parsed) {
+                return;
             }
-            return lines.join('\n');
+            const line = document.createElement('div');
+            line.className = 'plg-ai-help-line';
+            parsed.parts.forEach((part) => {
+                if (part.type === 'link') {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'plg-ai-help-example';
+                    btn.textContent = part.text;
+                    btn.addEventListener('click', () => {
+                        fillCompose(part.prompt);
+                    });
+                    line.appendChild(btn);
+                    return;
+                }
+                line.appendChild(document.createTextNode(part.text));
+            });
+            parent.appendChild(line);
+        }
+
+        function linkedBlock(lines) {
+            const wrap = document.createElement('div');
+            wrap.className = 'plg-ai-help';
+            (lines || []).forEach((row) => {
+                if (row === '') {
+                    const gap = document.createElement('div');
+                    gap.className = 'plg-ai-help-gap';
+                    wrap.appendChild(gap);
+                    return;
+                }
+                appendLinkedRow(wrap, row);
+            });
+            return wrap;
+        }
+
+        function slashHelpNode() {
+            const wrap = document.createElement('div');
+            wrap.className = 'plg-ai-help';
+            visibleCatalog().forEach((cmd) => {
+                appendLinkedRow(wrap, `[[/${cmd.name}]] — ${slashHint(cmd)}`);
+            });
+            const examples = Array.isArray(options.examples) ? options.examples : [];
+            if (!examples.length) {
+                return wrap;
+            }
+            const heading = document.createElement('div');
+            heading.className = 'plg-ai-help-examples-label';
+            heading.textContent = I18N.slashExamples;
+            wrap.appendChild(heading);
+            examples.forEach((row) => {
+                appendLinkedRow(wrap, row);
+            });
+            return wrap;
         }
 
         function toolsText() {
@@ -1524,25 +2036,26 @@ if (!window.jPulse) {
             });
         }
 
-        function modelStatusText() {
+        function modelStatusLines(prefix) {
             const cap = state.capability || {};
             const def = cap.defaultModel || {};
             const provider = state.selectedProvider || def.provider || '';
             const model = state.selectedModel || def.model || '';
             const isDefault = provider === def.provider && model === def.model;
-            const lines = [
+            const lines = prefix ? [prefix, ''] : [];
+            lines.push(
                 `${I18N.provider}: ${provider || '—'}`,
                 `${I18N.model}: ${model || '—'}${isDefault && model ? ` (${I18N.siteDefault})` : ''}`,
                 '',
                 I18N.available + ':'
-            ];
+            );
             (cap.models || []).forEach((row) => {
                 const pair = `${row.provider}/${row.model}`;
                 const label = row.label && row.label !== pair ? ` — ${row.label}` : '';
                 const off = row.available === false ? ' (off)' : '';
-                lines.push(`/model ${pair}${label}${off}`);
+                lines.push(`[[/model ${pair}]]${label}${off}`);
             });
-            return lines.join('\n');
+            return lines;
         }
 
         function hideSlashPicker() {
@@ -1552,7 +2065,7 @@ if (!window.jPulse) {
         }
 
         function renderSlashPicker() {
-            const matches = filterSlashCommands(els.input.value);
+            const matches = filterSlashCommands(els.input.value, catalog, commandCtx());
             if (!matches.length) {
                 hideSlashPicker();
                 return;
@@ -1560,18 +2073,15 @@ if (!window.jPulse) {
             if (state.slashHighlight >= matches.length) {
                 state.slashHighlight = 0;
             }
-            const help = {
-                help: I18N.slashHelp,
-                tools: I18N.slashTools,
-                model: I18N.slashModel,
-                new: I18N.slashNew,
-                cancel: I18N.slashCancel
-            };
             els.slash.hidden = false;
-            els.slash.innerHTML = matches.map((name, idx) => {
+            els.slash.innerHTML = matches.map((cmd, idx) => {
                 const active = idx === state.slashHighlight ? ' plg-ai-slash-item--active' : '';
-                return `<button type="button" class="plg-ai-slash-item${active}" data-name="${escapeHtml(name)}">/${escapeHtml(name)} — ${escapeHtml(help[name] || '')}</button>`;
+                return `<button type="button" class="plg-ai-slash-item${active}" data-name="${escapeHtml(cmd.name)}">/${escapeHtml(cmd.name)} — ${escapeHtml(slashHint(cmd))}</button>`;
             }).join('');
+            const active = els.slash.querySelector('.plg-ai-slash-item--active');
+            if (active && typeof active.scrollIntoView === 'function') {
+                active.scrollIntoView({ block: 'nearest' });
+            }
         }
 
         function updateSlashPicker() {
@@ -1587,64 +2097,186 @@ if (!window.jPulse) {
             return cmd.arg ? `/${cmd.name} ${cmd.arg}` : `/${cmd.name}`;
         }
 
-        async function appendLocal(userText, agentText) {
-            state.locals.push({
+        async function appendLocal(userText, agentReply) {
+            const entry = {
                 userText: userText,
-                agentText: agentText,
+                agentText: '',
+                agentNode: null,
                 at: Date.now()
-            });
+            };
+            if (agentReply && typeof agentReply === 'object' && agentReply.nodeType) {
+                entry.agentNode = agentReply;
+            } else if (agentReply != null) {
+                entry.agentText = String(agentReply);
+            }
+            state.locals.push(entry);
             await renderTurns();
         }
 
-        async function applySlash(cmd) {
-            if (cmd.name === 'help') {
-                return slashHelpLines();
+        async function runModel(cmd) {
+            if (!cmd.arg) {
+                return linkedBlock(modelStatusLines());
             }
-            if (cmd.name === 'tools') {
-                return toolsText();
+            const pair = parseModelArg(cmd.arg);
+            if (!pair || !modelOnMenu(pair)) {
+                return I18N.modelNotAllowed;
             }
-            if (cmd.name === 'model') {
-                if (!cmd.arg) {
-                    return modelStatusText();
+            state.selectedProvider = pair.provider;
+            state.selectedModel = pair.model;
+            if (state.threadId) {
+                const res = await jPulse.api.put(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}`, pair);
+                if (!res.success) {
+                    return res.error || res.code || I18N.modelNotAllowed;
                 }
-                const pair = parseModelArg(cmd.arg);
-                if (!pair || !modelOnMenu(pair)) {
-                    return I18N.modelNotAllowed;
+                const thread = currentThread();
+                if (thread) {
+                    thread.provider = pair.provider;
+                    thread.model = pair.model;
                 }
-                state.selectedProvider = pair.provider;
-                state.selectedModel = pair.model;
-                if (state.threadId) {
-                    const res = await jPulse.api.put(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}`, pair);
-                    if (!res.success) {
-                        return res.error || res.code || I18N.modelNotAllowed;
-                    }
-                    const thread = currentThread();
-                    if (thread) {
-                        thread.provider = pair.provider;
-                        thread.model = pair.model;
-                    }
-                }
-                return I18N.modelSet.replace('{{pair}}', `${pair.provider}/${pair.model}`)
-                    + '\n\n' + modelStatusText();
             }
-            if (cmd.name === 'new') {
+            const setLine = fillToken(I18N.modelSet, '%MODEL%', `${pair.provider}/${pair.model}`);
+            return linkedBlock(modelStatusLines(setLine));
+        }
+
+        async function runConversations(cmd) {
+            const threads = state.threads || [];
+            if (!threads.length) {
+                return I18N.slashConversationsNone;
+            }
+            const arg = String(cmd.arg || '').trim();
+            if (arg) {
+                const index = parseInt(arg, 10);
+                if (!Number.isFinite(index) || index < 1 || index > threads.length) {
+                    return I18N.slashConversationsBad;
+                }
+                const thread = threads[index - 1];
+                await openThread(thread._id);
+                return fillToken(I18N.slashConversationsOpened, '%LABEL%', threadOptionLabel(thread));
+            }
+            return linkedBlock(threads.map((thread, idx) => {
+                return `[[/conversations ${idx + 1}]] — ${threadOptionLabel(thread)}`;
+            }));
+        }
+
+        function runQuota() {
+            const quota = state.capability && state.capability.quota;
+            const rows = quota && quota.rows;
+            if (!Array.isArray(rows) || !rows.length) {
+                return I18N.slashQuotaNone;
+            }
+            return rows.map((row) => {
+                const used = row.used == null ? '—' : row.used;
+                const limit = row.limit == null ? '—' : row.limit;
+                let line = `${row.dimension} (${row.period}): ${used} / ${limit}`;
+                if (row.dimension === 'cost' && row.costUnknown) {
+                    line += ` (${I18N.slashCostUnknown})`;
+                }
+                return line;
+            }).join('\n');
+        }
+
+        function runSources() {
+            const cap = state.capability || {};
+            const lines = [];
+            state.sources.forEach((src) => {
+                lines.push(`${src.name} · ${src.origin} · ${src.chars}`);
+            });
+            state.images.forEach((img) => {
+                lines.push(`${img.name} · image · ${img.width || 0}×${img.height || 0}`);
+            });
+            if (!lines.length) {
+                lines.push(I18N.slashSourcesNone);
+            }
+            if (cap.maxSourcesPerConversation) {
+                lines.push(`${I18N.slashSourcesCap}: ${state.sources.length} / ${cap.maxSourcesPerConversation}`);
+            }
+            return lines.join('\n');
+        }
+
+        function runStatus() {
+            const cap = state.capability || {};
+            const pair = `${state.selectedProvider || '—'}/${state.selectedModel || '—'}`;
+            return [
+                `${I18N.slashStatusChats}: ${(state.threads || []).length}`,
+                `${I18N.slashStatusTurns}: ${(state.turns || []).length}`,
+                `${I18N.slashStatusTransport}: ${cap.transport || 'http'}`,
+                `${I18N.slashStatusThread}: ${state.threadId || '—'}`,
+                `${I18N.slashStatusModel}: ${pair}`,
+                state.running ? I18N.slashStatusRunning : I18N.slashStatusIdle
+            ].join('\n');
+        }
+
+        function runContext() {
+            const rows = readContextOptions();
+            const value = contextGet();
+            const current = rows.find((row) => row.value === value);
+            const label = current ? current.label : value;
+            const target = typeof adapter.describeTarget === 'function' ? adapter.describeTarget() : '';
+            const lines = [
+                `${I18N.slashContextCurrent}: ${label || '—'}`,
+                target ? `${I18N.slashContextTarget}: ${target}` : '',
+                '',
+                `${I18N.slashContextOptions}:`
+            ].filter((line, idx, all) => line !== '' || (idx > 0 && all[idx - 1] !== ''));
+            rows.forEach((row) => {
+                const mark = row.value === value ? '* ' : '  ';
+                const extra = row.unavailable ? ` (${I18N.slashContextUnavailable})` : '';
+                lines.push(`${mark}${row.label}${extra}`);
+            });
+            return lines.join('\n');
+        }
+
+        async function runCancel() {
+            if (!state.running) {
+                return I18N.slashCancelIdle;
+            }
+            await cancelTurn();
+            return I18N.cancel;
+        }
+
+        const FRAMEWORK_RUNNERS = {
+            help: slashHelpNode,
+            tools: toolsText,
+            model: runModel,
+            new: async function () {
                 await createNew();
                 return I18N.newConversation;
+            },
+            cancel: runCancel,
+            conversations: runConversations,
+            quota: runQuota,
+            sources: runSources,
+            status: runStatus,
+            context: runContext
+        };
+
+        async function applySlash(cmd) {
+            const entry = lookupCommand(catalog, cmd.name);
+            if (!entry || !commandAvailable(entry, commandCtx(cmd))) {
+                return I18N.slashUnknown;
             }
-            if (cmd.name === 'cancel') {
-                await cancelTurn();
-                return I18N.cancel;
+            const ctx = commandCtx(cmd);
+            if (typeof entry.run === 'function') {
+                return entry.run(ctx);
+            }
+            const runner = FRAMEWORK_RUNNERS[entry.name];
+            if (typeof runner === 'function') {
+                return runner(cmd);
             }
             return I18N.slashUnknown;
         }
 
         async function runSlash(cmd) {
             const reply = await applySlash(cmd);
+            if (reply === null) {
+                await appendLocal(slashDisplay(cmd), '');
+                return;
+            }
             await appendLocal(slashDisplay(cmd), reply);
         }
 
         function commandFromPicker(name) {
-            const parsed = parseSlashCommand(els.input.value.trim());
+            const parsed = parseSlashCommand(els.input.value.trim(), catalog, commandCtx());
             if (parsed && parsed.kind === 'command' && parsed.name === name) {
                 return parsed;
             }
@@ -1749,7 +2381,10 @@ if (!window.jPulse) {
                 body.model = state.selectedModel;
             }
             if (typeof adapter.describeContext === 'function') {
-                body.context = adapter.describeContext();
+                body.context = adapter.describeContext(hasContextOptions() ? contextGet() : undefined);
+            } else if (hasContextOptions()) {
+                const selected = readContextOptions().find((row) => row.value === contextGet());
+                body.context = selected ? selected.label : contextGet();
             }
             if (typeof adapter.describeTarget === 'function') {
                 body.target = adapter.describeTarget();
@@ -1799,6 +2434,7 @@ if (!window.jPulse) {
                     showToast(event.message || I18N.error, 'error');
                 }
                 showNotice('', false);
+                emitRegionEvent('turn');
                 openThread(state.threadId, { keepLocals: true });
             }
         });
@@ -1910,9 +2546,10 @@ if (!window.jPulse) {
             const raw = els.input.value;
             const trimmed = raw.trim();
             if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-                const matches = filterSlashCommands(trimmed);
+                const matches = filterSlashCommands(trimmed, catalog, commandCtx());
                 if (matches.length) {
-                    await executePickedSlash(matches[state.slashHighlight] || matches[0]);
+                    const picked = matches[state.slashHighlight] || matches[0];
+                    await executePickedSlash(picked.name);
                     return;
                 }
                 els.input.value = '';
@@ -1920,7 +2557,7 @@ if (!window.jPulse) {
                 await appendLocal(trimmed, I18N.slashUnknown);
                 return;
             }
-            const parsed = parseSlashCommand(trimmed);
+            const parsed = parseSlashCommand(trimmed, catalog, commandCtx());
             const text = parsed && parsed.kind === 'literal' ? parsed.text : raw;
             if (!String(text || '').trim()) {
                 return;
@@ -1937,7 +2574,7 @@ if (!window.jPulse) {
         });
         els.input.addEventListener('input', updateSlashPicker);
         els.input.addEventListener('keydown', (event) => {
-            const matches = filterSlashCommands(els.input.value);
+            const matches = filterSlashCommands(els.input.value, catalog, commandCtx());
             const pickerOpen = !els.slash.hidden && matches.length > 0;
             if (event.key === 'ArrowDown' && pickerOpen) {
                 event.preventDefault();
@@ -2285,6 +2922,11 @@ if (!window.jPulse) {
                 addTextSource(text, { origin: 'paste', mimeType: 'text/plain' });
             }
         });
+        if (els.contextSelect) {
+            els.contextSelect.addEventListener('change', () => {
+                contextSet(els.contextSelect.value);
+            });
+        }
         els.cancel.addEventListener('click', cancelTurn);
         els.newer.addEventListener('click', createNew);
         els.rename.addEventListener('click', startRename);
@@ -2318,14 +2960,17 @@ if (!window.jPulse) {
                 state.capability = capability;
                 applyThreadModel(currentThread());
                 if (capability.retentionDays) {
-                    showNotice(I18N.retention.replace('{{days}}', String(capability.retentionDays)), true);
+                    showNotice(fillToken(I18N.retention, '%DAYS%', String(capability.retentionDays)), true);
                 }
                 await refreshThreads();
                 if (state.threadId) {
                     await openThread(state.threadId);
                 } else if (state.threads[0]) {
                     await openThread(state.threads[0]._id);
+                } else {
+                    loadThreadContext();
                 }
+                refreshRegions();
             } catch (error) {
                 showToast(error.message || I18N.loadError, 'error');
             }
@@ -2352,6 +2997,23 @@ if (!window.jPulse) {
             handle.sources = panelApi.sources;
             handle.sourceFile = panelApi.sourceFile;
             handle.images = panelApi.images;
+            handle.regions = {
+                refresh: refreshRegions
+            };
+            handle.context = {
+                get: contextGet,
+                set: function (value) {
+                    contextSet(value);
+                },
+                refresh: function () {
+                    const rows = readContextOptions();
+                    const match = rows.find((row) => row.value === state.contextValue);
+                    if (!match) {
+                        state.contextValue = firstAvailableContext(rows);
+                    }
+                    renderContextRow();
+                }
+            };
         }
         return panelApi;
     }
@@ -2360,7 +3022,15 @@ if (!window.jPulse) {
         parseSlashCommand: parseSlashCommand,
         filterSlashCommands: filterSlashCommands,
         parseModelArg: parseModelArg,
+        parseExampleRow: parseExampleRow,
         loadToolModule: loadToolModule,
+        commands: {
+            defaults: COMMAND_DEFAULTS.slice(),
+            normalizeCatalog: normalizeCatalog,
+            parseSlashCommand: parseSlashCommand,
+            filterSlashCommands: filterSlashCommands,
+            parseExampleRow: parseExampleRow
+        },
         transport: {
             create: createTransport
         },

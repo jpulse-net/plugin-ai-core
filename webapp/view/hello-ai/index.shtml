@@ -4,7 +4,7 @@
  * @tagline         hello-ai scratch-pad demo
  * @description     Floating chat panel over browser-only draft state
  * @file            plugins/ai-core/webapp/view/hello-ai/index.shtml
- * @version         1.0.4
+ * @version         1.0.5
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -89,18 +89,58 @@
             return draft.value.slice(start, end);
         }
 
-        jPulse.ai.panel.create({
+        const padDefault = draft.value;
+        const panel = jPulse.ai.panel.create({
             scopeType: 'hello-ai',
             scopeId: 'demo',
             launcher: '#hello-ai-launch',
             examples: [
-                'Read the scratch pad',
-                'Translate this text into "Yoda-speak"',
-                'Summarize the scratch pad and append that text',
-                'Propose a shorter rewrite of the scratch pad',
-                'What time is it on the server?',
-                'Read the attached source and summarize it',
-                'What does this image say?'
+                '[[Read the scratch pad]]',
+                '[[Translate this text into "Yoda-speak"]] — for Star Wars fans',
+                '[[Summarize the scratch pad and append that text]]',
+                '[[Shorten it]] — propose a shorter rewrite of the scratch pad',
+                '[[What time is it on the server?]]',
+                '[[Read the attached source and summarize it]]',
+                '[[What does this image say?]]'
+            ],
+            commands: [
+                ...jPulse.ai.commands.defaults,
+                {
+                    name: 'pad',
+                    hint: 'Scratch pad size and selection',
+                    run: function () {
+                        const start = draft.selectionStart || 0;
+                        const end = draft.selectionEnd || 0;
+                        const selected = end > start ? end - start : 0;
+                        return 'Scratch pad has ' + draft.value.length
+                            + ' characters, ' + selected + ' selected';
+                    }
+                },
+                {
+                    name: 'padreset',
+                    hint: 'Restore the demo text',
+                    hidden: true,
+                    run: function () {
+                        draft.value = padDefault;
+                        if (panel.handle && panel.handle.regions) {
+                            panel.handle.regions.refresh('pad-stats');
+                        }
+                        return 'Scratch pad restored.';
+                    }
+                }
+            ],
+            regions: [
+                {
+                    name: 'pad-stats',
+                    anchor: 'composeBelow',
+                    render: function () {
+                        const start = draft.selectionStart || 0;
+                        const end = draft.selectionEnd || 0;
+                        const selected = end > start ? end - start : 0;
+                        return 'Scratch pad has ' + draft.value.length
+                            + ' characters, ' + selected + ' selected';
+                    }
+                }
             ],
             adapter: {
                 _undoById: {},
@@ -144,15 +184,26 @@
                         summary: 'append_draft ' + text.length + ' chars'
                     };
                 },
-                describeScope: function () {
-                    return 'Hello AI scratch pad';
-                },
                 describeContext: function () {
                     return 'Unsaved scratch pad';
                 },
                 describeTarget: function () {
                     return selectionOf() || 'all text';
                 }
+            }
+        });
+
+        function refreshPadStats() {
+            if (panel.handle && panel.handle.regions) {
+                panel.handle.regions.refresh('pad-stats');
+            }
+        }
+
+        draft.addEventListener('input', refreshPadStats);
+        draft.addEventListener('select', refreshPadStats);
+        document.addEventListener('selectionchange', function () {
+            if (document.activeElement === draft) {
+                refreshPadStats();
             }
         });
     });

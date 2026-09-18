@@ -1,6 +1,6 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.4
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.5
 
-A jPulse site gets an agent by configuring one rather than building one.
+A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
 ## The simple case
 
@@ -105,9 +105,9 @@ jPulse.ai.panel.create({
     scopeId:   docId,
     adapter: {
         toolData(name) { … },
-        describeScope() { … },
         describeContext() { … },
         describeTarget() { … },
+        contextOptions() { … },
         executeTool(name, args) { … },
         renderProposalPreview(proposal) { … },
         applyProposal(proposal) { … },
@@ -116,7 +116,7 @@ jPulse.ai.panel.create({
 });
 ```
 
-`adapter` may be omitted. `toolData` plus the three `describe*` methods are enough for a read-only agent. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`.
+`adapter` may be omitted. `toolData` plus `describeContext` / `describeTarget` are enough for a read-only agent. Scope labels belong on `onAiScopeResolve`, not the adapter. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`. `contextOptions()` is optional: implement it and the panel shows a context row and `/context`; omit it and neither appears.
 
 `get_source` and `list_sources` are owned by the panel. The client bridge asks a panel-internal provider before `adapter.toolData`, so a site with no adapter still gets working sources. Those two names are reserved.
 
@@ -126,19 +126,34 @@ jPulse.ai.panel.create({
 
 ## Slash commands
 
-Resolved in the panel; none are sent to the model.
+Resolved in the panel; none are sent to the model. Omit `commands` and the panel uses `jPulse.ai.commands.defaults`. Pass `commands` and you own the complete list: a string names a framework implementation, an object adds or overrides, and the last entry with a given name wins.
 
 | Command | Action |
 |---|---|
-| `/help` | List commands |
+| `/help` | List commands, then the site's `examples` |
 | `/tools` | Offered tools (with host) and withheld tools (with reason) |
-| `/model` | Show the current pair and the allowed list; `/model provider/model` sets the pair |
-| `/new` | Start a conversation |
-| `/cancel` | Cancel the running turn |
+| `/model` | Show the current pair and the allowed list; `/model provider/model` sets the pair. Always listed |
+| `/new` | Start a conversation. Alias `/clear` |
+| `/cancel` | Cancel the running turn, or say that none is running |
+| `/conversations` | List the last 20; `/conversations 3` opens one. Alias `/resume` |
+| `/quota` | Remaining caps from the capability probe. Hidden when the probe has no rows |
+| `/sources` | Attached sources and images. Hidden when sources and images are disabled |
+| `/status` | Conversation count, turns in the current conversation, transport, thread, pair, and idle or running. Always listed |
+| `/context` | Current context, target, and options. Hidden unless `adapter.contextOptions` exists |
 
-Typing `/` opens the picker. Enter runs the highlighted command and posts it into the transcript. Esc dismisses the picker. `//help` sends the literal text `/help`. `/help` can list page-specific examples passed as `examples` on `panel.create`.
+Typing `/` opens the picker. Enter runs the highlighted command and posts it into the transcript. Esc dismisses the picker. `//help` sends the literal text `/help`. A site command is `{ name, aliases, hint, when, hidden, run }`. `run` may be async and may return a string, a node, or `null` when it drew its own UI. `ctx.framework()` runs the framework implementation of that name when one exists.
+
+`examples` is the content slot inside `/help`. `[[Label]]` anywhere in a row is a clickable span that fills the compose box with that text. Text after the brackets stays as a note: `[[Shorten it]] — propose a shorter rewrite`. A single `[docs]` stays plain text. `/help` command names, `/model` pairs, and `/conversations` rows use the same links so a click puts `/status`, `/model provider/model`, or `/conversations 3` in the compose box. Clicking never sends.
 
 The model is not in the panel header. `/model` is how you view and set it. Conversation title, switch, rename, and new conversation sit on one row under the title.
+
+## Panel regions
+
+The framework owns order and placement. A site fills named anchors: `header`, `transcriptTop`, `transcriptBottom`, `composeAbove`, `composeBelow`. A region is `{ name, anchor, priority, render, on }`. `render` returns a DOM node, a string the panel escapes as text, or `null` to hide. `handle.regions.refresh(name)` re-renders one region, or every region when the name is omitted. Existing chrome (notice, intercept, strip, Apply cards) is not a region.
+
+## Context row
+
+`adapter.contextOptions()` returns `[{ value, label, unavailable? }]`. The panel remembers the selected value per thread in the tab. `describeContext(value)` turns it into the sentence on the turn. `handle.context` is `{ get, set, refresh }` so a page gesture can keep the select in sync. An `unavailable` option stays selectable and is never auto-picked.
 
 ## Propose and apply
 
@@ -181,7 +196,7 @@ Use a direct `mutates: true` write when the user is looking at the change and ca
 
 Those tools register only when `scopeType` is `hello-ai`. Installing the bundle does not force a WebSocket on every other page.
 
-Type the examples from `/help` in the panel. For `curl`, prefix `[mock:tool:<name>:<jsonArgs>]`. JSON arrays cannot be typed in the bracket form (`]` ends the marker); objects and scalars are fine. The structured `script` field is still accepted on a turn if a site wants to drive tools without the model choosing them.
+`/help` lists clickable examples that fill the compose box. `/pad` prints the pad size; `/padreset` (hidden) restores the demo text. A character count sits below the compose box. For `curl`, prefix `[mock:tool:<name>:<jsonArgs>]`. JSON arrays cannot be typed in the bracket form (`]` ends the marker); objects and scalars are fine. The structured `script` field is still accepted on a turn if a site wants to drive tools without the model choosing them.
 
 ## Attachments
 

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Cancel Broadcast
  * @tagline         Cancel flag via broadcast callback
  * @file            plugins/ai-core/webapp/tests/unit/cancel-broadcast.test.js
- * @version         1.0.4
+ * @version         1.0.5
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

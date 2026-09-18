@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.4
+# jPulse Framework / Plugins / AI Core Plugin v1.0.5
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock`.
 
@@ -50,6 +50,8 @@ jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
 
 The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. Open `/hello-ai/` for the scratch-pad demo (no API key). Drop a file or paste an image on the panel to attach a source or try vision.
 
+The panel accepts site `regions` at named anchors and a complete `commands` list (`jPulse.ai.commands.defaults` is the spread). `/help` command names and examples may be clickable `[[label]]` rows; text after the brackets is a note. `adapter.contextOptions()` shows a context row; `handle.context` keeps it in sync with the page. Sites that implemented `describeScope` on the adapter can delete it — scope labels live on `onAiScopeResolve`.
+
 See [docs/README.md](docs/README.md).
 
 ## Hooks defined
@@ -80,6 +82,8 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.5: Site-owned panel regions and slash commands — named anchors, a complete `commands` list, ten gated defaults, clickable `[[label]]` rows, and a context row gated on `adapter.contextOptions()`. `describeScope` removed from the adapter.
+- 1.0.4: Attachments, URL ingest, document conversion path, and vision — tab-local sources, Redis-staged images, `list_sources` / `get_source`, streaming convert and image-stage routes. No converter ships.
 - 1.0.3: Propose and apply — proposal records on the turn, Apply cards, apply/undo endpoints, and a site-configured false-claim guard. `hello-ai` adds `propose_draft_rewrite` beside the direct write.
 - 1.0.2: Chat panel (`jPulse.ai.panel`), client-host tools over a per-thread WebSocket, shared `utils/ai-tools/` modules, and the `/hello-ai/` scratch-pad demo. Requires framework >= 2.0.3.
 - 1.0.1: Model-selection surface — omit a provider with `configured: false`, persist the thread pair, accept `provider`/`model` on `PUT /api/1/ai/thread/:id`, grey non-vision rows when `?hasImages=1`, provider-only site default, and the live capability probe on `/jpulse-plugins/ai-core.shtml`.

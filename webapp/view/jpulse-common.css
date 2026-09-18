@@ -3,7 +3,7 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.4
+ * @version         1.0.5
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -117,7 +117,7 @@
 
 .plg-ai-compose {
     position: relative;
-    padding: 8px 10px 10px;
+    padding: 8px 10px 6px;
     border-top: 1px solid var(--jp-theme-border-color);
     flex-shrink: 0;
     transition: box-shadow 0.12s ease, background-color 0.12s ease;
@@ -139,6 +139,8 @@
     gap: 2px;
     margin-bottom: 8px;
     padding: 4px;
+    max-height: 180px;
+    overflow-y: auto;
     border: 1px solid var(--jp-theme-border-color);
     border-radius: 6px;
     background: var(--jp-theme-bg-secondary);
@@ -429,6 +431,72 @@
     font-size: 0.8em;
     color: var(--jp-theme-text-secondary);
     margin: 4px 0 8px;
+}
+
+.plg-ai-anchor {
+    flex-shrink: 0;
+}
+
+.plg-ai-region {
+    display: block;
+    padding: 2px 0 0;
+    color: var(--jp-theme-text-secondary);
+    font-size: 0.85em;
+}
+
+.plg-ai-compose > .plg-ai-anchor[data-anchor="composeBelow"] .plg-ai-region {
+    padding: 0;
+    margin: 2px 0 0;
+}
+
+.plg-ai-context {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+
+.plg-ai-context-label {
+    flex-shrink: 0;
+    color: var(--jp-theme-text-secondary);
+    font-size: 0.85em;
+}
+
+.plg-ai-context-select {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.plg-ai-help-command,
+.plg-ai-help-line {
+    margin: 0;
+    line-height: 1.35;
+}
+
+.plg-ai-help-gap {
+    height: 0.7em;
+}
+
+.plg-ai-help-examples-label {
+    margin: 8px 0 2px;
+    color: var(--jp-theme-text-secondary);
+    font-size: 0.85em;
+}
+
+.plg-ai-help-example {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--jp-theme-color-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.plg-ai-help-example:hover {
+    text-decoration: underline;
 }
 
 @keyframes plg-ai-dot-jump {
