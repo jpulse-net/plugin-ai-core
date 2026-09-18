@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -56,6 +56,7 @@ if (!window.jPulse) {
         slashHost: '{{i18n.view.ui.ai.slash.host}}',
         slashWithheld: '{{i18n.view.ui.ai.slash.withheld}}',
         slashReason: '{{i18n.view.ui.ai.slash.reason}}',
+        slashReasonReserved: '{{i18n.view.ui.ai.slash.reasonReserved}}',
         slashNone: '{{i18n.view.ui.ai.slash.none}}',
         slashUnknown: '{{i18n.view.ui.ai.slash.unknown}}',
         slashExamples: '{{i18n.view.ui.ai.slash.examples}}',
@@ -107,6 +108,7 @@ if (!window.jPulse) {
         visionGated: '{{i18n.view.ui.ai.attach.visionGated}}',
         imagesUnavailable: '{{i18n.view.ui.ai.attach.imagesUnavailable}}',
         noConverter: '{{i18n.view.ui.ai.attach.noConverter}}',
+        oversizeFile: '{{i18n.view.ui.ai.attach.oversizeFile}}',
         usedSources: '{{i18n.view.ui.ai.attach.usedSources}}'
     };
     const PANEL_TOOLS = { list_sources: true, get_source: true };
@@ -1186,6 +1188,7 @@ if (!window.jPulse) {
 
         function sourceMeta(src) {
             return {
+                kind: 'source',
                 id: src.id,
                 name: src.name,
                 origin: src.origin,
@@ -1198,13 +1201,31 @@ if (!window.jPulse) {
 
         function imageMeta(img) {
             return {
+                kind: 'image',
                 id: img.id,
                 name: img.name,
-                origin: 'image',
+                origin: img.origin || 'file',
                 mimeType: img.mimeType,
                 width: img.width || 0,
                 height: img.height || 0
             };
+        }
+
+        function formatCapBytes(n) {
+            const v = Number(n) || 0;
+            if (v >= 1048576) {
+                const mb = v / 1048576;
+                const s = mb >= 10 ? String(Math.round(mb)) : mb.toFixed(1).replace(/\.0$/, '');
+                return s + ' MB';
+            }
+            if (v >= 1024) {
+                return Math.round(v / 1024) + ' KB';
+            }
+            return v + ' bytes';
+        }
+
+        function fileOverCap(file, cap) {
+            return !!(file && Number.isFinite(file.size) && Number.isFinite(cap) && cap > 0 && file.size > cap);
         }
 
         function hideChipPop() {
@@ -1447,7 +1468,7 @@ if (!window.jPulse) {
             }
         }
 
-        async function addImageFile(file) {
+        async function addImageFile(file, opts) {
             const cap = state.capability || {};
             if (cap.imagesEnabled === false) {
                 showToast(`File type ${(file && file.type) || 'unknown'} is not supported.`, 'error');
@@ -1488,14 +1509,15 @@ if (!window.jPulse) {
                 name: resized.name || 'image',
                 mimeType: resized.mimeType,
                 width: resized.width,
-                height: resized.height
+                height: resized.height,
+                origin: (opts && opts.origin) || 'file'
             });
             syncStore();
             renderStrip();
             refreshCapability();
         }
 
-        async function addDroppedFile(file) {
+        async function addDroppedFile(file, opts) {
             const kind = classifyFile(file);
             if (!kind.ok) {
                 showToast(kind.error || I18N.error, 'error');
@@ -1503,10 +1525,22 @@ if (!window.jPulse) {
                 return;
             }
             if (kind.image) {
-                await addImageFile(file);
+                const imageCap = (state.capability && state.capability.maxImageBytes) || 4194304;
+                if (fileOverCap(file, imageCap)) {
+                    showToast(fillToken(I18N.oversizeFile, '%SIZE%', formatCapBytes(imageCap)), 'error');
+                    flashDropRefuse();
+                    return;
+                }
+                await addImageFile(file, { origin: (opts && opts.origin) || 'file' });
                 return;
             }
             if (kind.convert) {
+                const convertCap = (state.capability && state.capability.maxConvertBytes) || 26214400;
+                if (fileOverCap(file, convertCap)) {
+                    showToast(fillToken(I18N.oversizeFile, '%SIZE%', formatCapBytes(convertCap)), 'error');
+                    flashDropRefuse();
+                    return;
+                }
                 const threadId = await ensureThread();
                 const res = await fetch('/api/1/ai/source/convert', {
                     method: 'POST',
@@ -1910,6 +1944,7 @@ if (!window.jPulse) {
                 emitRegionEvent('thread');
                 return;
             }
+            await refreshThreads();
             const res = await jPulse.api.get(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/turns`);
             state.turns = res.success ? (res.data || []) : [];
             applyThreadModel(currentThread());
@@ -2024,7 +2059,8 @@ if (!window.jPulse) {
                 return `\`${tool.name}\` · ${I18N.slashHost} ${tool.host || 'server'} — ${tool.description || ''}`;
             });
             withheld.forEach((row) => {
-                rows.push(`${I18N.slashWithheld} \`${row.name}\` · ${I18N.slashReason} ${row.reason || ''}`);
+                const reason = row.reason === 'reserved' ? I18N.slashReasonReserved : (row.reason || '');
+                rows.push(`${I18N.slashWithheld} \`${row.name}\` · ${I18N.slashReason} ${reason}`);
             });
             return rows.join('\n');
         }
@@ -2182,7 +2218,7 @@ if (!window.jPulse) {
                 lines.push(`${src.name} · ${src.origin} · ${src.chars}`);
             });
             state.images.forEach((img) => {
-                lines.push(`${img.name} · image · ${img.width || 0}×${img.height || 0}`);
+                lines.push(`${img.name} · ${img.origin || 'file'} · ${img.width || 0}×${img.height || 0}`);
             });
             if (!lines.length) {
                 lines.push(I18N.slashSourcesNone);
@@ -2912,7 +2948,7 @@ if (!window.jPulse) {
             if (files.length) {
                 event.preventDefault();
                 for (const file of files) {
-                    await addDroppedFile(file);
+                    await addDroppedFile(file, { origin: 'paste' });
                 }
                 return;
             }
@@ -2983,20 +3019,16 @@ if (!window.jPulse) {
             send: sendText,
             parseSlashCommand: parseSlashCommand,
             filterSlashCommands: filterSlashCommands,
-            sources: function () {
-                return state.sources.map(sourceMeta);
+            attachments: function () {
+                return state.sources.map(sourceMeta).concat(state.images.map(imageMeta));
             },
-            sourceFile: function (id) {
+            attachmentFile: function (id) {
                 return panelStore.files.get(id) || null;
-            },
-            images: function () {
-                return state.images.map(imageMeta);
             }
         };
         if (handle) {
-            handle.sources = panelApi.sources;
-            handle.sourceFile = panelApi.sourceFile;
-            handle.images = panelApi.images;
+            handle.attachments = panelApi.attachments;
+            handle.attachmentFile = panelApi.attachmentFile;
             handle.regions = {
                 refresh: refreshRegions
             };

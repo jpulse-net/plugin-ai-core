@@ -3,8 +3,8 @@
  * @tagline         In-process tool registry
  * @description     Imperative registration plus collection from onAiToolRegister
  * @file            plugins/ai-core/webapp/utils/tools/registry.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,9 +12,42 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
-import { normalizeDescriptor } from './descriptor.js';
+import { isReservedToolName, normalizeDescriptor, RESERVED_TOOL_OWNER } from './descriptor.js';
 
 const tools = new Map();
+const reservedRefusals = [];
+const reservedWarned = new Set();
+
+export function listReservedRefusals() {
+    return reservedRefusals.slice();
+}
+
+export function clearReservedRefusals() {
+    reservedRefusals.length = 0;
+    reservedWarned.clear();
+}
+
+function warnReserved(name, owner) {
+    const key = `${owner}:${name}`;
+    if (reservedWarned.has(key)) {
+        return;
+    }
+    reservedWarned.add(key);
+    reservedRefusals.push({ name, owner });
+    const message = `refused reserved tool name "${name}" from owner "${owner}"; the AI panel owns this name`;
+    if (global.LogController?.logWarning) {
+        global.LogController.logWarning(null, 'aiCore.registerTools', message);
+    }
+}
+
+function refuseReserved(item, owner) {
+    const name = typeof item?.name === 'string' ? item.name.trim() : '';
+    if (isReservedToolName(name) && owner !== RESERVED_TOOL_OWNER) {
+        warnReserved(name, owner);
+        return true;
+    }
+    return false;
+}
 
 /**
  * @param {object|object[]} raw
@@ -25,6 +58,9 @@ export function registerTools(raw, owner = 'site') {
     const list = Array.isArray(raw) ? raw : [raw];
     const accepted = [];
     for (const item of list) {
+        if (refuseReserved(item, owner)) {
+            continue;
+        }
         const tool = normalizeDescriptor(item, owner);
         if (!tool) {
             continue;
@@ -37,6 +73,7 @@ export function registerTools(raw, owner = 'site') {
 
 export function clearTools() {
     tools.clear();
+    clearReservedRefusals();
 }
 
 export function getTool(name) {
@@ -93,6 +130,9 @@ async function collectFromRegisterHook(hookManager, hookCtx) {
 
 function pushNormalized(accepted, incoming, owner) {
     for (const item of incoming || []) {
+        if (refuseReserved(item, owner)) {
+            continue;
+        }
         const tool = normalizeDescriptor({ ...item, owner: undefined }, owner);
         if (tool) {
             accepted.push(tool);

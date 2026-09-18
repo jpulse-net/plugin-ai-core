@@ -3,8 +3,8 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -64,9 +64,13 @@ export function deriveThreadLabel(text) {
     return cleaned.length > AUTO_TITLE_MAX ? `${cleaned.slice(0, AUTO_TITLE_MAX).trim()}…` : cleaned;
 }
 
-function formatPromptDebugLine(turnId, tools, system, userText, messages) {
+function formatPromptDebugLine(turnId, tools, system, userText, messages, withheld) {
     const toolNames = (tools || []).map(t => t.name).join(', ');
     let line = `prompt: turn=${turnId}; tools=[ ${toolNames} ]; user=${JSON.stringify(userText || '')};`;
+    const reserved = (withheld || []).filter((row) => row.reason === 'reserved');
+    if (reserved.length) {
+        line += ` reserved=[ ${reserved.map((row) => `${row.owner || '?'}:${row.name}`).join(', ')} ];`;
+    }
     const prior = Array.isArray(messages) && messages.length ? messages.slice(0, -1) : [];
     if (prior.length) {
         const packed = JSON.stringify(prior);
@@ -287,7 +291,8 @@ export async function runTurn(params) {
                     resolved.tools,
                     prompt.system,
                     params.userText,
-                    messages
+                    messages,
+                    resolved.withheld
                 ), actor);
             }
 

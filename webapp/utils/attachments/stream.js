@@ -3,8 +3,8 @@
  * @tagline         Collect a streaming request body
  * @description     StreamBody.pipe into a capped in-memory buffer
  * @file            plugins/ai-core/webapp/utils/attachments/stream.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -87,7 +87,7 @@ export function sanitizeImageMeta(list) {
         const entry = {
             id: String(row.id || ''),
             name: String(row.name || 'image').slice(0, 120),
-            origin: 'image',
+            origin: String(row.origin || 'file'),
             mimeType: String(row.mimeType || ''),
             width: Number(row.width) || 0,
             height: Number(row.height) || 0

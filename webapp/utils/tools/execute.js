@@ -3,8 +3,8 @@
  * @tagline         Server-host tool execution
  * @description     Four gates, then client executor, module run, or onAiToolExecute
  * @file            plugins/ai-core/webapp/utils/tools/execute.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -23,6 +23,7 @@ import {
 } from './envelope.js';
 import { gateTool } from './gates.js';
 import { inspectModule, runModule } from './modules.js';
+import { effectiveTimeoutMs } from './descriptor.js';
 import { getTool } from './registry.js';
 
 function liftMedia(raw) {
@@ -81,7 +82,7 @@ async function resolveModuleData(tool, params, hookManager) {
 }
 
 function withTimeout(promise, timeoutMs) {
-    const ms = Number.isFinite(timeoutMs) ? timeoutMs : 5000;
+    const ms = Number.isFinite(timeoutMs) ? timeoutMs : effectiveTimeoutMs(null);
     if (ms <= 0) {
         return promise;
     }
@@ -149,7 +150,7 @@ export async function executeTool(params) {
                     module: tool.module || null,
                     moduleHash: moduleInfo.hash || null
                 }),
-                tool.timeoutMs
+                effectiveTimeoutMs(tool, params.settings)
             );
             let envelope = normalizeResult(raw, tool);
             envelope.ms = Date.now() - started;
@@ -172,7 +173,7 @@ export async function executeTool(params) {
     if (tool.module) {
         try {
             const data = await resolveModuleData(tool, params, hookManager);
-            const raw = await withTimeout(runModule(tool.module, data, args), tool.timeoutMs);
+            const raw = await withTimeout(runModule(tool.module, data, args), effectiveTimeoutMs(tool, params.settings));
             let envelope = normalizeResult(raw, tool);
             envelope.ms = Date.now() - started;
             if (params.fromClient === true) {
@@ -204,7 +205,7 @@ export async function executeTool(params) {
         if (hookManager && typeof hookManager.executeForPlugin === 'function') {
             await withTimeout(
                 hookManager.executeForPlugin('onAiToolExecute', tool.owner, ctx),
-                tool.timeoutMs
+                effectiveTimeoutMs(tool, params.settings)
             );
         }
     } catch (error) {

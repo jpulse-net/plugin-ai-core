@@ -3,8 +3,8 @@
  * @tagline         Tools layer public surface
  * @description     Registry, actor, gates, budgets, envelope — no agent or transport imports
  * @file            plugins/ai-core/webapp/utils/tools/index.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -20,7 +20,15 @@ export {
     threadOwner
 } from './actor.js';
 export { createBudgetState } from './budgets.js';
-export { normalizeDescriptor, publicTool } from './descriptor.js';
+export {
+    DEFAULT_TOOL_TIMEOUT_MS,
+    effectiveTimeoutMs,
+    isReservedToolName,
+    normalizeDescriptor,
+    publicTool,
+    RESERVED_TOOL_NAMES,
+    RESERVED_TOOL_OWNER
+} from './descriptor.js';
 export {
     AI_BUDGET_EXCEEDED,
     AI_CAPABILITY_DENIED,
@@ -54,10 +62,12 @@ export {
 export { authorizeTool, gateTool } from './gates.js';
 export { isToolEnabled, normalizePolicy, seedReviewedNames } from './policy.js';
 export {
+    clearReservedRefusals,
     clearTools,
     collectTools,
     getTool,
     listRegisteredTools,
+    listReservedRefusals,
     registerTools
 } from './registry.js';
 export { resolveScope, resolveTools } from './resolve.js';

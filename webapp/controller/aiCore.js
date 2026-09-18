@@ -3,8 +3,8 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,6 +14,7 @@
 
 import {
     broadcastCancel,
+    deleteByScope,
     filterAllowedModels,
     firstExceededCap,
     gateModelsForVision,
@@ -54,7 +55,9 @@ import {
 import {
     clientFetchMessage,
     convertDocument,
+    deleteStagedThread,
     converterMimeList,
+    maxConvertBytesOf,
     fetchAcceptList,
     ingestFetchedBody,
     isAllowedImageMime,
@@ -224,7 +227,7 @@ class AiCoreController {
             handler: 'apiConvertSource',
             auth: 'user',
             bodyMode: 'stream',
-            bodyLimit: '8mb'
+            bodyLimit: '25mb'
         },
         {
             method: 'POST',
@@ -232,7 +235,7 @@ class AiCoreController {
             handler: 'apiStageImage',
             auth: 'user',
             bodyMode: 'stream',
-            bodyLimit: '5mb'
+            bodyLimit: '25mb'
         },
         { method: 'POST', path: '/api/1/ai/thread', handler: 'apiCreateThread', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread', handler: 'apiListThreads', auth: 'user' },
@@ -311,6 +314,12 @@ class AiCoreController {
                         default: 120000,
                         label: '{{i18n.view.ui.ai.config.turnTimeoutMs}}'
                     },
+                    defaultToolTimeoutMs: {
+                        type: 'number',
+                        default: 10000,
+                        label: '{{i18n.view.ui.ai.config.defaultToolTimeoutMs}}',
+                        help: '{{i18n.view.ui.ai.config.defaultToolTimeoutMsHelp}}'
+                    },
                     maxContextChars: {
                         type: 'number',
                         default: 100000,
@@ -381,7 +390,8 @@ class AiCoreController {
                     maxSourceChars: {
                         type: 'number',
                         default: 1000000,
-                        label: '{{i18n.view.ui.ai.config.maxSourceChars}}'
+                        label: '{{i18n.view.ui.ai.config.maxSourceChars}}',
+                        help: '{{i18n.view.ui.ai.config.maxSourceCharsHelp}}'
                     },
                     maxTotalSourceChars: {
                         type: 'number',
@@ -424,6 +434,12 @@ class AiCoreController {
                         default: '',
                         label: '{{i18n.view.ui.ai.config.urlBlockedHosts}}'
                     },
+                    maxConvertBytes: {
+                        type: 'number',
+                        default: 26214400,
+                        label: '{{i18n.view.ui.ai.config.maxConvertBytes}}',
+                        help: '{{i18n.view.ui.ai.config.maxConvertBytesHelp}}'
+                    },
                     maxConvertPages: {
                         type: 'number',
                         default: 100,
@@ -447,7 +463,8 @@ class AiCoreController {
                     maxImageBytes: {
                         type: 'number',
                         default: 4194304,
-                        label: '{{i18n.view.ui.ai.config.maxImageBytes}}'
+                        label: '{{i18n.view.ui.ai.config.maxImageBytes}}',
+                        help: '{{i18n.view.ui.ai.config.maxImageBytesHelp}}'
                     },
                     maxImageEdge: {
                         type: 'number',
@@ -500,7 +517,12 @@ class AiCoreController {
                 usageModel: opts.usageModel || AiUsageModel
             }),
             listProviders,
-            loadSettings
+            loadSettings,
+            deleteByScope: (opts) => deleteByScope(opts, {
+                threadModel: AiThreadModel,
+                turnModel: AiTurnModel,
+                deleteStagedThread
+            })
         };
     }
 
@@ -597,7 +619,8 @@ class AiCoreController {
                     maxSourceChars: settings.maxSourceChars,
                     maxTotalSourceChars: settings.maxTotalSourceChars,
                     maxSourceReadChars: settings.maxSourceReadChars,
-                    maxImageBytes: settings.maxImageBytes,
+                    maxConvertBytes: maxConvertBytesOf(settings),
+                    maxImageBytes: maxImageBytesOf(settings),
                     maxImageEdge: settings.maxImageEdge,
                     imageMimeTypes: settings.imageMimeTypes
                 }
@@ -1039,9 +1062,7 @@ class AiCoreController {
             if (settings.sourcesEnabled === false) {
                 return sendError(req, res, 403, 'Sources are disabled', 'AI_SOURCES_DISABLED');
             }
-            const bytes = await collectStreamBody(req, res, settings.maxSourceChars
-                ? Math.min(8 * 1024 * 1024, settings.maxSourceChars * 4)
-                : '8mb');
+            const bytes = await collectStreamBody(req, res, maxConvertBytesOf(settings));
             if (bytes == null) {
                 return;
             }

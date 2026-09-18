@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -284,6 +284,9 @@ describe('adapter contract scan', () => {
         expect(panel).not.toMatch(/bubblemap/);
         expect(panel).not.toMatch(/synapse/);
         expect(panel).not.toMatch(/const SLASH_COMMANDS = \['help'/);
+        expect(panel).toMatch(
+            /async function openThread\(threadId, options\) \{[\s\S]*?await refreshThreads\(\);[\s\S]*?\/turns/
+        );
         const stub = {
             toolData() { return {}; },
             describeContext() { return 'context'; },

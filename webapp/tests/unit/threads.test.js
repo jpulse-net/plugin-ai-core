@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Threads
  * @tagline         One active thread per scope and user
  * @file            plugins/ai-core/webapp/tests/unit/threads.test.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -123,6 +123,55 @@ describe('threads', () => {
         expect(listed).toHaveLength(2);
         expect(String(listed[0]._id)).toBe(String(third._id));
         expect(String(listed[1]._id)).toBe(String(second._id));
+    });
+
+    test('touch moves a thread to the front of listForOwner', async () => {
+        const collection = memoryCollection();
+        AiThreadModel.useCollection(collection);
+        const first = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-touch',
+            createdBy: 'jdoe',
+            now: new Date('2026-01-01T00:00:00Z')
+        });
+        await AiThreadModel._update(first._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-01-01T00:00:00Z'),
+            label: 'Just a hello'
+        });
+        const second = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-touch',
+            createdBy: 'jdoe',
+            now: new Date('2026-09-17T00:00:00Z')
+        });
+        await AiThreadModel._update(second._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-09-17T12:00:00Z'),
+            label: 'Attachment tests'
+        });
+        const third = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-touch',
+            createdBy: 'jdoe',
+            now: new Date('2026-09-17T18:00:00Z'),
+            label: 'German'
+        });
+        let listed = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-touch'
+        });
+        expect(listed.map((row) => row.label)).toEqual(['German', 'Attachment tests', 'Just a hello']);
+        await AiThreadModel.touch(first._id);
+        listed = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-touch'
+        });
+        expect(String(listed[0]._id)).toBe(String(first._id));
+        expect(listed[0].label).toBe('Just a hello');
+        expect(String(listed[1]._id)).toBe(String(third._id));
     });
 
     test('updateThread can set label and the provider/model pair', async () => {

@@ -3,8 +3,8 @@
  * @tagline         Sources, ingest, convert, and image staging
  * @description     Prompt manifests, UrlFetch mapping, converter call path, Redis mailbox
  * @file            plugins/ai-core/webapp/utils/attachments/index.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -21,8 +21,10 @@ import {
     emptyExtractMessage,
     listConverters,
     matchConverters,
+    maxConvertBytesOf,
     noConverterMessage,
-    publicConverters
+    publicConverters,
+    ROUTE_MAX_BYTES
 } from './convert.js';
 import {
     extractHtmlText,
@@ -43,6 +45,7 @@ import {
 import {
     buildUserMessage,
     deleteStagedImage,
+    deleteStagedThread,
     imageFormatShort,
     imageMimeAllowlist,
     isAllowedImageMime,
@@ -65,6 +68,7 @@ export {
     DEFAULT_URL_MAX_BYTES,
     DEFAULT_URL_TIMEOUT_MS,
     deleteStagedImage,
+    deleteStagedThread,
     EMPTY_SHELL_MESSAGE,
     emptyExtractCode,
     emptyExtractMessage,
@@ -78,6 +82,7 @@ export {
     isEmptyShell,
     listConverters,
     matchConverters,
+    maxConvertBytesOf,
     maxImageBytesOf,
     mediaType,
     modelHasVision,
@@ -88,6 +93,7 @@ export {
     parseHostList,
     publicConverters,
     redisImagesAvailable,
+    ROUTE_MAX_BYTES,
     stageImage,
     takeStagedImage,
     takeStagedImages,
@@ -144,7 +150,7 @@ export function sourceRefsFrom(sources, images) {
         refs.push({
             id: String(img.id),
             name: clipName(img.name) || 'image',
-            origin: img.origin || 'image',
+            origin: img.origin || 'file',
             type: img.mimeType || 'image'
         });
     }

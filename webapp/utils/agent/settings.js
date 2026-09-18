@@ -3,8 +3,8 @@
  * @tagline         Effective AI settings
  * @description     Site config tab, optional app.conf.ai, and plugin debug flag
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -27,6 +27,7 @@ export const AI_CONFIG_DEFAULTS = {
     maxTokensPerDay: 400000,
     maxRoundsPerTurn: 8,
     turnTimeoutMs: 120000,
+    defaultToolTimeoutMs: 10000,
     maxContextChars: 100000,
     disabledTools: [],
     reviewedTools: [],
@@ -46,6 +47,7 @@ export const AI_CONFIG_DEFAULTS = {
     urlTimeoutMs: 15000,
     urlAllowedHosts: [],
     urlBlockedHosts: [],
+    maxConvertBytes: 26214400,
     maxConvertPages: 100,
     convertTimeoutMs: 30000,
     imagesEnabled: true,
@@ -124,6 +126,9 @@ export function mergeSettings(sources = {}) {
         turnTimeoutMs: Number.isFinite(site.turnTimeoutMs)
             ? site.turnTimeoutMs
             : AI_CONFIG_DEFAULTS.turnTimeoutMs,
+        defaultToolTimeoutMs: Number.isFinite(site.defaultToolTimeoutMs)
+            ? site.defaultToolTimeoutMs
+            : AI_CONFIG_DEFAULTS.defaultToolTimeoutMs,
         maxContextChars: Number.isFinite(site.maxContextChars)
             ? site.maxContextChars
             : AI_CONFIG_DEFAULTS.maxContextChars,
@@ -165,6 +170,9 @@ export function mergeSettings(sources = {}) {
             : AI_CONFIG_DEFAULTS.urlTimeoutMs,
         urlAllowedHosts: asArray(site.urlAllowedHosts),
         urlBlockedHosts: asArray(site.urlBlockedHosts),
+        maxConvertBytes: Number.isFinite(site.maxConvertBytes)
+            ? site.maxConvertBytes
+            : AI_CONFIG_DEFAULTS.maxConvertBytes,
         maxConvertPages: Number.isFinite(site.maxConvertPages)
             ? site.maxConvertPages
             : AI_CONFIG_DEFAULTS.maxConvertPages,

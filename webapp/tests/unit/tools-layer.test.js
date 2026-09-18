@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Tools Layer
  * @tagline         Gates, budgets, envelope — no Express request
  * @file            plugins/ai-core/webapp/tests/unit/tools-layer.test.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -19,9 +19,11 @@ import {
     AI_POLICY_DENIED,
     AI_RESULT_TOO_LARGE,
     AI_UNKNOWN_TOOL,
+    DEFAULT_TOOL_TIMEOUT_MS,
     RESULT_SIZE_CAP,
     clearTools,
     createBudgetState,
+    effectiveTimeoutMs,
     executeTool,
     registerTools,
     resolveTools
@@ -163,6 +165,79 @@ describe('tools layer', () => {
             scope: {}
         });
         expect(hidden.tools.map(t => t.name)).not.toContain('get_outline');
+    });
+
+    test('omitted timeoutMs follows the site default; an explicit value wins', async () => {
+        registerTools(tool({ requires: null }), 'site');
+        registerTools(tool({ name: 'slow_one', description: 'Slow', requires: null, timeoutMs: 35000 }), 'site');
+        const unset = await resolveTools(testActor(), {
+            policy: {},
+            scope: {},
+            settings: { defaultToolTimeoutMs: 12000 }
+        });
+        expect(unset.tools.find((row) => row.name === 'get_outline').timeoutMs).toBe(12000);
+        expect(unset.tools.find((row) => row.name === 'slow_one').timeoutMs).toBe(35000);
+        const shipped = await resolveTools(testActor(), {
+            policy: {},
+            scope: {},
+            settings: {}
+        });
+        expect(shipped.tools.find((row) => row.name === 'get_outline').timeoutMs).toBe(DEFAULT_TOOL_TIMEOUT_MS);
+        expect(effectiveTimeoutMs({ timeoutMs: null }, {})).toBe(10000);
+        expect(effectiveTimeoutMs({ timeoutMs: null }, { defaultToolTimeoutMs: 35000 })).toBe(35000);
+        expect(effectiveTimeoutMs({ timeoutMs: 2000 }, { defaultToolTimeoutMs: 35000 })).toBe(2000);
+    });
+
+    test('site registration of a reserved name is refused and withheld', async () => {
+        const warnings = [];
+        global.LogController = {
+            logWarning(_req, method, message) {
+                warnings.push({ method, message });
+            }
+        };
+        registerTools({
+            name: 'get_source',
+            description: 'Panel reader',
+            schema,
+            host: 'client',
+            requires: 'scope:read'
+        }, 'ai-core');
+        registerTools({
+            name: 'get_source',
+            description: 'Leftover site copy',
+            schema
+        }, 'site');
+        const hooks = createHookManager({
+            onAiScopeResolve: (ctx) => {
+                ctx.scope = { canRead: true };
+            }
+        });
+        const offered = await resolveTools(testActor(), {
+            hookManager: hooks,
+            policy: {},
+            settings: { sourcesEnabled: true },
+            hasSources: true
+        });
+        expect(offered.tools.find((row) => row.name === 'get_source').owner).toBe('ai-core');
+        expect(offered.tools.find((row) => row.name === 'get_source').description).toBe('Panel reader');
+        expect(offered.withheld.some((row) => row.name === 'get_source' && row.reason === 'reserved')).toBe(true);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0].message).toMatch(/get_source/);
+        registerTools({
+            name: 'get_source',
+            description: 'Again',
+            schema
+        }, 'site');
+        expect(warnings).toHaveLength(1);
+        delete global.LogController;
+    });
+
+    test('non-reserved names still follow last-wins', async () => {
+        registerTools(tool({ name: 'get_tree', description: 'First', requires: null }), 'site');
+        registerTools(tool({ name: 'get_tree', description: 'Second', requires: null }), 'other');
+        const resolved = await resolveTools(testActor(), { policy: {}, scope: {} });
+        expect(resolved.tools.find((row) => row.name === 'get_tree').owner).toBe('other');
+        expect(resolved.tools.find((row) => row.name === 'get_tree').description).toBe('Second');
     });
 
     test('onAiToolRegister stamps owner from the handler plugin', async () => {

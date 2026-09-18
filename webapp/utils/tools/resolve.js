@@ -3,8 +3,8 @@
  * @tagline         The one offered-tool-list function
  * @description     Recomputed every round; used by the loop, the probe, and later MCP
  * @file            plugins/ai-core/webapp/utils/tools/resolve.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,10 +13,10 @@
  */
 
 import { normalizeActor } from './actor.js';
-import { publicTool } from './descriptor.js';
+import { DEFAULT_TOOL_TIMEOUT_MS, publicTool } from './descriptor.js';
 import { authorizeTool } from './gates.js';
 import { inspectModule } from './modules.js';
-import { collectTools } from './registry.js';
+import { collectTools, listReservedRefusals } from './registry.js';
 
 /**
  * Resolve scope via onAiScopeResolve. Handlers mutate ctx.scope in place
@@ -62,7 +62,15 @@ export async function resolveTools(actor, options = {}) {
 
     const offered = [];
     const withheld = [];
-    for (const tool of registered) {
+    const defaultTimeout = Number.isFinite(options.settings?.defaultToolTimeoutMs)
+        && options.settings.defaultToolTimeoutMs > 0
+        ? options.settings.defaultToolTimeoutMs
+        : DEFAULT_TOOL_TIMEOUT_MS;
+    for (const raw of registered) {
+        const tool = { ...raw };
+        if (!Number.isFinite(tool.timeoutMs)) {
+            tool.timeoutMs = defaultTimeout;
+        }
         if ((tool.name === 'get_source' || tool.name === 'list_sources')
             && (options.settings?.sourcesEnabled === false || options.hasSources !== true)) {
             withheld.push({
@@ -92,6 +100,11 @@ export async function resolveTools(actor, options = {}) {
             }
         }
         offered.push(tool);
+    }
+    for (const row of listReservedRefusals()) {
+        if (!withheld.some((item) => item.name === row.name && item.reason === 'reserved')) {
+            withheld.push({ name: row.name, reason: 'reserved', owner: row.owner });
+        }
     }
 
     return {

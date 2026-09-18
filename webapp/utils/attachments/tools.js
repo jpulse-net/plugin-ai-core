@@ -3,8 +3,8 @@
  * @tagline         Framework-owned source tools
  * @description     list_sources and get_source descriptors
  * @file            plugins/ai-core/webapp/utils/attachments/tools.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,8 +13,9 @@
  */
 
 import { isSourceTextRead } from '../ai-tools/sources.js';
+import { RESERVED_TOOL_NAMES } from '../tools/descriptor.js';
 
-export const PANEL_TOOL_NAMES = ['list_sources', 'get_source'];
+export const PANEL_TOOL_NAMES = RESERVED_TOOL_NAMES;
 
 export function isPanelTool(name) {
     return PANEL_TOOL_NAMES.indexOf(name) !== -1;

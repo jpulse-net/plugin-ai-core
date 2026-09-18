@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -41,6 +41,17 @@ describe('settings', () => {
             site: { proposalClaimPhrases: 'Ready for review\n/please apply/i' }
         });
         expect(custom.proposalClaimPhrases).toEqual(['Ready for review', '/please apply/i']);
+    });
+
+    test('maxConvertBytes and defaultToolTimeoutMs ship at 25 MB and 10 s', () => {
+        const settings = mergeSettings({ site: { enabled: true } });
+        expect(settings.maxConvertBytes).toBe(26214400);
+        expect(settings.defaultToolTimeoutMs).toBe(10000);
+        const custom = mergeSettings({
+            site: { maxConvertBytes: 1048576, defaultToolTimeoutMs: 35000 }
+        });
+        expect(custom.maxConvertBytes).toBe(1048576);
+        expect(custom.defaultToolTimeoutMs).toBe(35000);
     });
 
     test('debugDumps stays off without plugin or app.conf flag', () => {

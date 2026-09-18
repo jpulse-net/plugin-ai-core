@@ -3,8 +3,8 @@
  * @tagline         Turn records
  * @description     One user message and everything the agent did in response
  * @file            plugins/ai-core/webapp/model/aiTurn.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -125,6 +125,20 @@ class AiTurnModel {
             { _id: coerceId(id) },
             { $push: { events: event }, $set: { updatedAt: new Date() } }
         );
+    }
+
+    static async deleteByThreadIds(ids) {
+        const collection = this.getCollection();
+        const list = (Array.isArray(ids) ? ids : []).map((id) => String(id)).filter(Boolean);
+        if (!list.length) {
+            return 0;
+        }
+        let deleted = 0;
+        for (const threadId of list) {
+            const result = await collection.deleteMany({ threadId });
+            deleted += result.deletedCount || 0;
+        }
+        return deleted;
     }
 
     static async purgeOlderThan(cutoff) {

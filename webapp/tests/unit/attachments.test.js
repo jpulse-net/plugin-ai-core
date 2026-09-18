@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Attachments
  * @tagline         Sources, ingest, convert, images, and loop purity
  * @file            plugins/ai-core/webapp/tests/unit/attachments.test.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -26,6 +26,10 @@ import {
     clientFetchMessage,
     convertDocument,
     convertLimits,
+    deleteStagedThread,
+    maxConvertBytesOf,
+    maxImageBytesOf,
+    ROUTE_MAX_BYTES,
     EMPTY_SHELL_MESSAGE,
     extractHtmlText,
     fetchAcceptList,
@@ -43,6 +47,7 @@ import {
     takeStagedImage,
     takeStagedImages
 } from '../../utils/attachments/index.js';
+import { collectStreamBody } from '../../utils/attachments/stream.js';
 import { sourceToolDescriptors } from '../../utils/attachments/tools.js';
 import { assemblePrompt } from '../../utils/agent/prompt.js';
 import { followFromResult, openUserContent, refsForTurn } from '../../utils/agent/inputs.js';
@@ -59,6 +64,7 @@ import { createHookManager, testActor } from './helpers.js';
 afterEach(() => {
     clearTools();
     delete global.RedisManager;
+    delete global.StreamBody;
 });
 
 const md = [
@@ -143,6 +149,15 @@ describe('sources module', () => {
         }, {});
         expect(listed.data.sources[0].text).toBeUndefined();
         expect(JSON.stringify(listed)).not.toContain('Hello world');
+    });
+
+    test('list_sources output has no kind field', () => {
+        const listed = run({
+            sources: [{ id: 'a', name: 'Doc', text: md, chars: md.length, origin: 'file', mimeType: 'text/markdown' }],
+            toolName: 'list_sources'
+        }, {});
+        expect(listed.data.sources[0].kind).toBeUndefined();
+        expect(JSON.stringify(listed)).not.toContain('"kind"');
     });
 });
 
@@ -284,6 +299,59 @@ describe('ingest', () => {
 });
 
 describe('convert', () => {
+    test('upload cap is independent of maxSourceChars (the 4 MB regression)', () => {
+        const shipped = { maxSourceChars: 1000000 };
+        expect(maxConvertBytesOf(shipped)).toBe(ROUTE_MAX_BYTES);
+        expect(maxConvertBytesOf({})).toBe(26214400);
+        expect(maxConvertBytesOf({ maxConvertBytes: 2 * 1024 * 1024 })).toBe(2 * 1024 * 1024);
+        expect(maxConvertBytesOf({ maxConvertBytes: 40 * 1024 * 1024 })).toBe(ROUTE_MAX_BYTES);
+        expect(maxImageBytesOf({ maxImageBytes: 10 * 1024 * 1024 })).toBe(10 * 1024 * 1024);
+        expect(maxImageBytesOf({ maxImageBytes: 40 * 1024 * 1024 })).toBe(ROUTE_MAX_BYTES);
+    });
+
+    test('a 25 MB convert is accepted at the shipped char cap; a lowered byte cap 413s', async () => {
+        const seen = [];
+        global.StreamBody = {
+            async pipe(_req, res, dest, options) {
+                seen.push(options.maxBytes);
+                const declared = Number(_req.headers['content-length']);
+                if (declared > options.maxBytes) {
+                    res.statusCode = 413;
+                    res.body = {
+                        success: false,
+                        code: 'PAYLOAD_TOO_LARGE',
+                        error: 'Request body too large',
+                        details: { limit: options.maxBytes, length: declared }
+                    };
+                    return null;
+                }
+                dest.write(Buffer.from('ok'));
+                dest.end();
+                return declared;
+            }
+        };
+        const shipped = maxConvertBytesOf({ maxSourceChars: 1000000 });
+        const okRes = {};
+        const accepted = await collectStreamBody(
+            { headers: { 'content-length': String(20 * 1024 * 1024) } },
+            okRes,
+            shipped
+        );
+        expect(accepted.length).toBe(2);
+        expect(seen[0]).toBe(26214400);
+        const lowered = maxConvertBytesOf({ maxConvertBytes: 1048576 });
+        const refuseRes = { statusCode: 0, body: null };
+        const refused = await collectStreamBody(
+            { headers: { 'content-length': String(2 * 1024 * 1024) } },
+            refuseRes,
+            lowered
+        );
+        expect(refused).toBe(null);
+        expect(refuseRes.statusCode).toBe(413);
+        expect(JSON.stringify(refuseRes.body)).toContain('1048576');
+        delete global.StreamBody;
+    });
+
     test('cap merge, ordered retry, empty extract, and undefined hooks', async () => {
         const limits = convertLimits({ maxConvertPages: 10, maxSourceChars: 50 }, { maxPages: 3, unitLabel: 'page' });
         expect(limits.maxPages).toBe(3);
@@ -326,6 +394,21 @@ describe('convert', () => {
         expect(retried.ok).toBe(true);
         expect(retried.text).toBe('Recovered text');
         expect(retried.plugin).toBe('ocr');
+        const clipped = await convertDocument({
+            bytes: Buffer.from('x'),
+            mimeType: 'application/pdf',
+            name: 'big.pdf',
+            settings: { maxSourceChars: 5, maxConvertBytes: 26214400 },
+            converters: [{ plugin: 'pdf', mimeTypes: ['application/pdf'] }],
+            hookManager: createHookManager({
+                'onDocumentConvert:pdf': (ctx) => {
+                    ctx.markdown = '0123456789';
+                }
+            })
+        });
+        expect(clipped.text).toBe('01234');
+        expect(clipped.truncatedBy).toBe('chars');
+        expect(clipped.limit).toBe(5);
     });
 });
 
@@ -372,6 +455,15 @@ describe('images', () => {
             redisManager: redis
         }, { imagesEnabled: true }, { capabilities: { vision: false } });
         expect(gated).toBe('What is this?');
+    });
+
+    test('deleteStagedThread removes the index and each image', async () => {
+        const redis = memoryRedis();
+        await stageImage('jdoe', 't1', 'img-1', { data: 'x', mimeType: 'image/png' }, {}, redis);
+        await stageImage('jdoe', 't1', 'img-2', { data: 'y', mimeType: 'image/png' }, {}, redis);
+        expect(await deleteStagedThread('jdoe', 't1', redis)).toBe(2);
+        expect(await takeStagedImage('jdoe', 't1', 'img-1', redis)).toBe(null);
+        expect(await deleteStagedThread('jdoe', 't1', redis)).toBe(0);
     });
 
     test('takeStagedImages deletes the mailbox', async () => {
@@ -483,6 +575,23 @@ describe('opt-in and loop purity', () => {
             hasSources: false
         });
         expect(empty.withheld.some((row) => row.reason === 'no-sources')).toBe(true);
+    });
+
+    test('panel handle is attachments() with kind, not sources/images/sourceFile', () => {
+        const text = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js'),
+            'utf8'
+        );
+        expect(text).toMatch(/handle\.attachments = /);
+        expect(text).toMatch(/handle\.attachmentFile = /);
+        expect(text).toMatch(/kind: 'source'/);
+        expect(text).toMatch(/kind: 'image'/);
+        expect(text).toMatch(/origin: \(opts && opts\.origin\) \|\| 'file'/);
+        expect(text).toMatch(/origin: 'paste'/);
+        expect(text).not.toMatch(/handle\.sources = /);
+        expect(text).not.toMatch(/handle\.images = /);
+        expect(text).not.toMatch(/handle\.sourceFile = /);
+        expect(text).not.toMatch(/sourceAttachable/);
     });
 
     test('turnLoop.js contains no attachment vocabulary', () => {

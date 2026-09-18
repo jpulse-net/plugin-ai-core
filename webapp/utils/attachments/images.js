@@ -3,14 +3,16 @@
  * @tagline         Redis image mailbox and content parts
  * @description     MIME allowlist, staging, take-once, and user-message parts
  * @file            plugins/ai-core/webapp/utils/attachments/images.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
+
+import { ROUTE_MAX_BYTES } from './convert.js';
 
 export const DEFAULT_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 export const IMAGE_CACHE_PATH = 'controller:aicore:image';
@@ -40,7 +42,8 @@ export function isAllowedImageMime(mimeType, settings) {
 
 export function maxImageBytesOf(settings) {
     const n = Number(settings && settings.maxImageBytes);
-    return Number.isFinite(n) && n > 0 ? n : 4194304;
+    const raw = Number.isFinite(n) && n > 0 ? n : 4194304;
+    return Math.min(raw, ROUTE_MAX_BYTES);
 }
 
 export function imageStageTtlOf(settings) {
@@ -236,6 +239,29 @@ export async function deleteStagedImage(username, threadId, imageId, redisManage
         return;
     }
     await redis.cacheSetObject?.(IMAGE_INDEX_PATH, indexKey, { ids });
+}
+
+/**
+ * Delete every staged image for one thread. Best-effort; TTL would expire them.
+ * @returns {Promise<number>}
+ */
+export async function deleteStagedThread(username, threadId, redisManager) {
+    const redis = redisManager || global.RedisManager;
+    if (!redis || typeof redis.cacheDel !== 'function') {
+        return 0;
+    }
+    const indexKey = imageIndexKey(username, threadId);
+    const existing = await redis.cacheGetObject?.(IMAGE_INDEX_PATH, indexKey);
+    const ids = Array.isArray(existing?.ids) ? existing.ids : [];
+    let deleted = 0;
+    for (const imageId of ids) {
+        await redis.cacheDel(IMAGE_CACHE_PATH, imageStageKey(username, threadId, imageId));
+        deleted += 1;
+    }
+    if (ids.length || existing) {
+        await redis.cacheDel(IMAGE_INDEX_PATH, indexKey);
+    }
+    return deleted;
 }
 
 export async function threadHasStagedImages(username, threadId, redisManager) {

@@ -3,8 +3,8 @@
  * @tagline         Tool descriptor defaults and owner stamp
  * @description     Normalize a tool registration; owner is stamped, never supplied
  * @file            plugins/ai-core/webapp/utils/tools/descriptor.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,6 +14,28 @@
 
 const HOSTS = new Set(['server', 'client']);
 const DATA_SCOPES = new Set(['call', 'turn']);
+
+export const RESERVED_TOOL_NAMES = ['list_sources', 'get_source'];
+export const RESERVED_TOOL_OWNER = 'ai-core';
+export const DEFAULT_TOOL_TIMEOUT_MS = 10000;
+
+export function isReservedToolName(name) {
+    return RESERVED_TOOL_NAMES.indexOf(name) !== -1;
+}
+
+/**
+ * Last-resort timeout when a registry tool was never stamped by resolveTools.
+ */
+export function effectiveTimeoutMs(tool, settings) {
+    if (Number.isFinite(tool?.timeoutMs)) {
+        return tool.timeoutMs;
+    }
+    const fromSettings = Number(settings?.defaultToolTimeoutMs);
+    if (Number.isFinite(fromSettings) && fromSettings > 0) {
+        return fromSettings;
+    }
+    return DEFAULT_TOOL_TIMEOUT_MS;
+}
 
 /**
  * @param {object} raw
@@ -41,7 +63,7 @@ export function normalizeDescriptor(raw, owner) {
         requires: raw.requires == null || raw.requires === '' ? null : String(raw.requires),
         mutates: raw.mutates === true,
         proposes: raw.proposes === true,
-        timeoutMs: Number.isFinite(raw.timeoutMs) ? raw.timeoutMs : 5000,
+        timeoutMs: Number.isFinite(raw.timeoutMs) ? raw.timeoutMs : null,
         group: typeof raw.group === 'string' && raw.group ? raw.group : 'read',
         budget: normalizeBudget(raw.budget),
         dedupeArgs: raw.dedupeArgs === true,

@@ -3,8 +3,8 @@
  * @tagline         Document conversion call path
  * @description     Lists converters, merges caps, ordered retry, empty-extract refusal
  * @file            plugins/ai-core/webapp/utils/attachments/convert.js
- * @version         1.0.6
- * @release         2026-09-17
+ * @version         1.0.7
+ * @release         2026-09-18
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,7 +12,18 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
-export const MAX_CONVERT_BYTES = Math.floor(25 * 1024 * 1024 * 0.72);
+export const ROUTE_MAX_BYTES = 26214400;
+
+/**
+ * Input-file cap for POST /api/1/ai/source/convert. Clamped to the route ceiling.
+ * @param {object} [settings]
+ * @returns {number}
+ */
+export function maxConvertBytesOf(settings) {
+    const n = Number(settings && settings.maxConvertBytes);
+    const raw = Number.isFinite(n) && n > 0 ? n : ROUTE_MAX_BYTES;
+    return Math.min(raw, ROUTE_MAX_BYTES);
+}
 
 function clipPhrase(value) {
     return String(value == null ? '' : value)

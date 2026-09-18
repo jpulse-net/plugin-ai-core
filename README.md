@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.6
+# jPulse Framework / Plugins / AI Core Plugin v1.0.7
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -50,7 +50,7 @@ jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
 
 The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. The bundled Hello AI plugin serves `/hello-ai/` (no API key). Drop a file or paste an image on the panel to attach a source or try vision. Copy that pattern; do not import the sample tools. Walkthrough: [Hello AI guide](/jpulse-docs/installed-plugins/hello-ai/README).
 
-The panel accepts site `regions` at named anchors and a complete `commands` list (`jPulse.ai.commands.defaults` is the spread). `/help` command names and examples may be clickable `[[label]]` rows; text after the brackets is a note. `adapter.contextOptions()` shows a context row; `handle.context` keeps it in sync with the page. Sites that implemented `describeScope` on the adapter can delete it — scope labels live on `onAiScopeResolve`.
+The panel accepts site `regions` at named anchors and a complete `commands` list (`jPulse.ai.commands.defaults` is the spread). `/help` command names and examples may be clickable `[[label]]` rows; text after the brackets is a note. `adapter.contextOptions()` shows a context row; `handle.context` keeps it in sync with the page. Sites that implemented `describeScope` on the adapter can delete it — scope labels live on `onAiScopeResolve`. Chips are `handle.attachments()` (`kind: 'source' | 'image'`); `handle.attachmentFile(id)` returns the original file. A deleted object is `AiCore.deleteByScope({ scopeType, scopeId })`.
 
 See [docs/README.md](docs/README.md).
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.7: Convert and image uploads honor Site Configuration → AI (`maxConvertBytes` default 25 MB under a 25mb route ceiling). `AiCore.deleteByScope` wipes a deleted object's conversations. Site-wide `defaultToolTimeoutMs` (10000). Reserved `list_sources` / `get_source` refused with a warning. `handle.attachments()` replaces `sources` / `images` / `sourceFile`.
 - 1.0.6: Hello AI extracted as a bundled companion plugin. `bundle.members` is `ai-mock` + `hello-ai`. Disable Hello AI to hide the demo without turning off AI.
 - 1.0.5: Site-owned panel regions and slash commands — named anchors, a complete `commands` list, ten gated defaults, clickable `[[label]]` rows, and a context row gated on `adapter.contextOptions()`. `describeScope` removed from the adapter.
 - 1.0.4: Attachments, URL ingest, document conversion path, and vision — tab-local sources, Redis-staged images, `list_sources` / `get_source`, streaming convert and image-stage routes. No converter ships.
