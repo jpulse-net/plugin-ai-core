@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / SSE
  * @tagline         POST+SSE HTTP events do not abort the turn
  * @file            plugins/ai-core/webapp/tests/unit/sse.test.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

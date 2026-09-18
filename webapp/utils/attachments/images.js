@@ -3,7 +3,7 @@
  * @tagline         Redis image mailbox and content parts
  * @description     MIME allowlist, staging, take-once, and user-message parts
  * @file            plugins/ai-core/webapp/utils/attachments/images.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

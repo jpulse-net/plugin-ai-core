@@ -1,8 +1,8 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
- * @tagline         Isolation, write path, mock sequence, adapter scan
+ * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,13 +14,11 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
-import HelloAiController from '../../controller/helloAi.js';
 import AiMockController, {
     lastToolResults,
     priorFromRows,
     resolvePriorValue
 } from '../../../../ai-mock/webapp/controller/aiMock.js';
-import { chooseTransport } from '../../utils/transport/index.js';
 import { historyToMessages } from '../../utils/agent/prompt.js';
 import { filterSlashCommands, normalizeCatalog, parseSlashCommand } from '../../utils/panel/slash.js';
 import {
@@ -38,27 +36,6 @@ const schema = { type: 'object', properties: {} };
 
 afterEach(() => {
     clearTools();
-});
-
-describe('hello-ai isolation', () => {
-    test('demo tools are not registered for another scope', async () => {
-        const ctx = { tools: [], actor: testActor({ scopeType: 'doc' }) };
-        await HelloAiController.onAiToolRegister(ctx);
-        expect(ctx.tools).toEqual([]);
-        expect(chooseTransport(ctx.tools)).toBe('http');
-    });
-
-    test('demo tools register only for hello-ai', async () => {
-        const ctx = { tools: [], actor: testActor({ scopeType: 'hello-ai' }) };
-        await HelloAiController.onAiToolRegister(ctx);
-        expect(ctx.tools.map(tool => tool.name)).toEqual([
-            'read_draft',
-            'propose_draft_rewrite',
-            'append_draft',
-            'get_hello_clock'
-        ]);
-        expect(chooseTransport(ctx.tools)).toBe('ws');
-    });
 });
 
 describe('write path', () => {
@@ -301,21 +278,11 @@ describe('slash catalog', () => {
 
 describe('adapter contract scan', () => {
     test('panel code does not reach into site state', () => {
-        const files = [
-            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js'),
-            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/hello-ai/index.shtml')
-        ];
-        const leaks = [];
-        for (const file of files) {
-            const text = fs.readFileSync(file, 'utf8');
-            if (text.includes('site/webapp') || text.includes('bubblemap') || text.includes('synapse')) {
-                leaks.push(path.basename(file));
-            }
-        }
-        expect(leaks).toEqual([]);
-        const hello = fs.readFileSync(files[1], 'utf8');
-        expect(hello).not.toMatch(/describeScope/);
-        const panel = fs.readFileSync(files[0], 'utf8');
+        const panelPath = path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js');
+        const panel = fs.readFileSync(panelPath, 'utf8');
+        expect(panel).not.toMatch(/site\/webapp/);
+        expect(panel).not.toMatch(/bubblemap/);
+        expect(panel).not.toMatch(/synapse/);
         expect(panel).not.toMatch(/const SLASH_COMMANDS = \['help'/);
         const stub = {
             toolData() { return {}; },

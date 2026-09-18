@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Proposals
  * @tagline         Derive, persist, notes, endpoints, loop purity, panel helpers
  * @file            plugins/ai-core/webapp/tests/unit/proposals.test.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -15,11 +15,9 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import AiCoreController from '../../controller/aiCore.js';
-import HelloAiController from '../../controller/helloAi.js';
 import AiTurnModel from '../../model/aiTurn.js';
 import { assemblePrompt, historyToMessages } from '../../utils/agent/prompt.js';
 import { cacheSettings } from '../../utils/agent/settings.js';
-import { run as runProposeRewrite } from '../../utils/ai-tools/proposeRewrite.js';
 import {
     applyProposalRecord,
     applyThenRecord,
@@ -533,63 +531,6 @@ describe('panel helpers', () => {
     test('a read-only agent has no card chrome inputs', () => {
         expect(pendingCards([])).toEqual([]);
         expect(claimsWithoutCard('Please apply this idea.', DEFAULT_CLAIM_PHRASES)).toBe(false);
-    });
-});
-
-describe('hello-ai propose module', () => {
-    test('proposeRewrite is pure and returns a proposal payload', () => {
-        const result = runProposeRewrite({ text: 'Old pad' }, { text: 'New pad' });
-        expect(result.ok).toBe(true);
-        expect(result.data.proposal.kind).toBe('rewrite');
-        expect(result.data.proposal.payload.text).toBe('New pad');
-        expect(result.data.proposal.payload.expectedChars).toBe(7);
-        expect(runProposeRewrite({ text: 'Old' }, { text: '' }).ok).toBe(false);
-    });
-
-    test('hello-ai apply/undo round trip against a stub pad', async () => {
-        const pad = { value: 'Old' };
-        const stash = {};
-        const adapter = {
-            applyProposal(proposal) {
-                stash[proposal.id] = pad.value;
-                pad.value = proposal.payload.text;
-                return true;
-            },
-            undoProposal(proposal) {
-                if (stash[proposal.id] == null) {
-                    return false;
-                }
-                pad.value = stash[proposal.id];
-                return true;
-            }
-        };
-        const proposal = { id: 'p1', payload: { text: 'New' } };
-        const applied = await applyThenRecord({
-            proposal,
-            apply: (row) => adapter.applyProposal(row),
-            record: () => true
-        });
-        expect(applied.ok).toBe(true);
-        expect(pad.value).toBe('New');
-        const undone = await undoThenRecord({
-            proposal,
-            undo: (row) => adapter.undoProposal(row),
-            record: () => true
-        });
-        expect(undone.ok).toBe(true);
-        expect(pad.value).toBe('Old');
-    });
-
-    test('demo registers the proposing tool only for hello-ai', async () => {
-        const other = { tools: [], actor: testActor({ scopeType: 'doc' }) };
-        await HelloAiController.onAiToolRegister(other);
-        expect(other.tools.map(tool => tool.name)).not.toContain('propose_draft_rewrite');
-        const hello = { tools: [], actor: testActor({ scopeType: 'hello-ai' }) };
-        await HelloAiController.onAiToolRegister(hello);
-        const propose = hello.tools.find(tool => tool.name === 'propose_draft_rewrite');
-        expect(propose.proposes).toBe(true);
-        expect(propose.module).toBe('proposeRewrite');
-        expect(propose.mutates).toBeFalsy();
     });
 });
 

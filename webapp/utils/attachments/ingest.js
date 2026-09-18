@@ -3,7 +3,7 @@
  * @tagline         UrlFetch result mapping and provenance
  * @description     Content-type handling, empty-shell, and per-code messages
  * @file            plugins/ai-core/webapp/utils/attachments/ingest.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

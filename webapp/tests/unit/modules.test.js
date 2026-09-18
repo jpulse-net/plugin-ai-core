@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Modules
  * @tagline         Hashing, purity, dataScope, two-host run
  * @file            plugins/ai-core/webapp/tests/unit/modules.test.js
- * @version         1.0.5
+ * @version         1.0.6
  * @release         2026-09-17
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -15,7 +15,6 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { run as runReadDraft } from '../../utils/ai-tools/readDraft.js';
 import { createHookManager, testActor } from './helpers.js';
 import {
     clearTools,
@@ -79,10 +78,10 @@ describe('shared tool modules', () => {
     test('scanner covers the plugin ai-tools directory', () => {
         const pluginDir = path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/ai-tools');
         const scanned = scanToolModules({ roots: [pluginDir] });
-        expect(scanned.map(row => row.name)).toContain('readDraft');
-        expect(scanned.map(row => row.name)).toContain('proposeRewrite');
-        expect(scanned.find(row => row.name === 'readDraft').ok).toBe(true);
-        expect(scanned.find(row => row.name === 'proposeRewrite').ok).toBe(true);
+        expect(scanned.map(row => row.name)).toContain('sources');
+        expect(scanned.find(row => row.name === 'sources').ok).toBe(true);
+        expect(scanned.map(row => row.name)).not.toContain('readDraft');
+        expect(scanned.map(row => row.name)).not.toContain('proposeRewrite');
     });
 
     test('stale hash is not served', () => {
@@ -152,37 +151,24 @@ describe('shared tool modules', () => {
         expect(third.data.n).toBe(2);
     });
 
-    test('the same module runs in Node against fixture data', async () => {
-        const result = runReadDraft({
-            text: 'one two three four',
-            selection: 'two'
-        }, {});
-        expect(result.ok).toBe(true);
-        expect(result.data.words).toBe(4);
-        expect(result.data.selection).toBe('two');
-        expect(result.data.text).toBe('one two three four');
-        expect(result.data.truncated).toBe(false);
-        const long = 'x'.repeat(200);
-        const clipped = runReadDraft({ text: long }, {});
-        expect(clipped.data.excerpt.endsWith('…')).toBe(true);
-        expect(clipped.data.excerpt.length).toBeLessThan(long.length);
-        expect(clipped.data.text).toBe(long);
-        expect(clipped.data.truncated).toBe(false);
+    test('a discovered module is offered when registered', async () => {
+        const dir = tempRoot({
+            'count.js': 'export function run(data) { return { n: data.n || 0 }; }\n'
+        });
         registerTools({
-            name: 'read_draft',
-            description: 'Read',
+            name: 'count_offered',
+            description: 'Count',
             schema,
             host: 'client',
-            module: 'readDraft',
+            module: 'count',
             requires: 'scope:read'
         }, 'site');
-        const pluginDir = path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/ai-tools');
-        discoverToolModules({ roots: [pluginDir] });
-        const offered = await resolveTools(testActor({ scopeType: 'hello-ai' }), {
+        discoverToolModules({ roots: [dir] });
+        const offered = await resolveTools(testActor({ scopeType: 'doc' }), {
             scope: { canRead: true },
             policy: { reviewedToolNames: [], disabledToolNames: [] }
         });
-        expect(offered.tools.map(tool => tool.name)).toContain('read_draft');
+        expect(offered.tools.map(tool => tool.name)).toContain('count_offered');
     });
 });
 

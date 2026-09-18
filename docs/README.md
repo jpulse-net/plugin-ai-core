@@ -1,10 +1,10 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.5
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.6
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
 ## The simple case
 
-Install (both members auto-enable), then pick settings on Site Configuration → AI:
+Install (all three members auto-enable), then pick settings on Site Configuration → AI:
 
 ```
 npx jpulse plugin install @jpulse-net/plugin-ai-core
@@ -64,7 +64,7 @@ The namespace is `jPulse.ai`, not `jPulse.plugins.aiCore`. That is deliberate: t
 
 Until you want a client-host tool, the transport stays HTTP. `GET /api/1/ai/capability` tells the panel which to use. Cancel is always `POST /api/1/ai/thread/:id/cancel`.
 
-`ai-mock` answers without an API key. Open `/hello-ai/` to see the panel, a scratch pad, and both hosts.
+`ai-mock` answers without an API key. The bundled [Hello AI](/jpulse-docs/installed-plugins/hello-ai/README) plugin serves `/hello-ai/` — a scratch pad and both hosts. Disable that plugin to hide the demo; AI stays on. Copy the pattern. Do not import those tools.
 
 ## Tool descriptor
 
@@ -183,20 +183,7 @@ Use a direct `mutates: true` write when the user is looking at the change and ca
 
 ## Hello AI
 
-`/hello-ai/` is a scratch pad. It never reaches the server. User-facing copy uses that one name, not draft or summary.
-
-| Tool | Host | Path |
-|---|---|---|
-| `read_draft` | client | module `readDraft` |
-| `propose_draft_rewrite` | client | module `proposeRewrite`, `proposes: true`, 3 proposals per turn |
-| `append_draft` | client | `adapter.executeTool`, `mutates: true`, 3 writes per turn |
-| `get_hello_clock` | server | `onAiToolExecute` |
-
-`append_draft` writes immediately. There is no Apply card; the undo is the textarea in front of you. `propose_draft_rewrite` is the other shape: it is a pure module, it writes nothing, and Apply / Undo sit on the card.
-
-Those tools register only when `scopeType` is `hello-ai`. Installing the bundle does not force a WebSocket on every other page.
-
-`/help` lists clickable examples that fill the compose box. `/pad` prints the pad size; `/padreset` (hidden) restores the demo text. A character count sits below the compose box. For `curl`, prefix `[mock:tool:<name>:<jsonArgs>]`. JSON arrays cannot be typed in the bracket form (`]` ends the marker); objects and scalars are fine. The structured `script` field is still accepted on a turn if a site wants to drive tools without the model choosing them.
+The sample is a separate bundled plugin. Open [`/hello-ai/`](/hello-ai/) or disable it under Plugin management. Walkthrough, tools, `/pad`, and how to copy the pattern: [Hello AI guide](/jpulse-docs/installed-plugins/hello-ai/README).
 
 ## Attachments
 
@@ -214,7 +201,7 @@ A site tool that returns a picture puts it in `data.media`. The envelope lifts t
 
 What a site adds through `onAiPromptFragment` is domain steering — where to put a document, what to extract. The framework owns the lifetime notice, the read tool, the manifest, URL messages, and the vision path.
 
-`ai-mock` ships a Mock Vision row that names the images it was handed, so `/hello-ai/` can demonstrate the gate with no API key.
+`ai-mock` ships a Mock Vision row that names the images it was handed, so the Hello AI demo can show the gate with no API key.
 
 ## Admin
 
