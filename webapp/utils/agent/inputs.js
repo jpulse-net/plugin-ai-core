@@ -3,7 +3,7 @@
  * @tagline         Turn-start user content and follow-up parts
  * @description     Thin loop-facing wrapper over the attachments layer
  * @file            plugins/ai-core/webapp/utils/agent/inputs.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -61,7 +61,8 @@ export async function openUserContent(params, settings, chosen) {
             threadOwner(params.actor),
             String(params.threadId || params.thread?._id || ''),
             images,
-            params.redisManager
+            params.redisManager,
+            settings
         );
         content = buildUserContent(text, staged);
     }

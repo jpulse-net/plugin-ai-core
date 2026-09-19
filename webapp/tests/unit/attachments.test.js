@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Attachments
  * @tagline         Sources, ingest, convert, images, and loop purity
  * @file            plugins/ai-core/webapp/tests/unit/attachments.test.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -26,6 +26,7 @@ import {
     clientFetchMessage,
     convertDocument,
     convertLimits,
+    deleteStagedImage,
     deleteStagedThread,
     maxConvertBytesOf,
     maxImageBytesOf,
@@ -33,9 +34,11 @@ import {
     EMPTY_SHELL_MESSAGE,
     extractHtmlText,
     fetchAcceptList,
+    appendManifestToUserContent,
     formatImagesBlock,
     formatSourcesBlock,
     formatSourcesEmptyBlock,
+    formatTurnAttachmentManifest,
     ingestFetchedBody,
     isAllowedImageMime,
     isEmptyShell,
@@ -45,7 +48,8 @@ import {
     sourceRefsFrom,
     stageImage,
     takeStagedImage,
-    takeStagedImages
+    takeStagedImages,
+    threadHasStagedImages
 } from '../../utils/attachments/index.js';
 import { collectStreamBody } from '../../utils/attachments/stream.js';
 import { sourceToolDescriptors } from '../../utils/attachments/tools.js';
@@ -184,6 +188,29 @@ describe('manifest', () => {
             id: 'a', name: 'Doc', mimeType: 'text/plain', chars: 4, sections: 1
         }], { item: 'note' });
         expect(block).toContain('note');
+    });
+
+    test('this-turn manifest is empty policy, live chips, or omitted', () => {
+        expect(formatTurnAttachmentManifest({
+            sources: [],
+            sourcesEnabled: true
+        })).toBe(formatSourcesEmptyBlock());
+        const live = formatTurnAttachmentManifest({
+            sources: [{ id: 'b', name: 'test.txt', mimeType: 'text/plain', chars: 8, sections: 1, text: 'SECRET' }],
+            images: [{ id: 'i', name: 'shot.png', width: 8, height: 6 }],
+            sourcesEnabled: true,
+            includeImages: true
+        });
+        expect(live).toContain('test.txt');
+        expect(live).toContain('shot.png');
+        expect(live).not.toContain('SECRET');
+        expect(formatTurnAttachmentManifest({
+            sources: [],
+            images: [{ id: 'i', name: 'shot.png' }],
+            sourcesEnabled: false,
+            includeImages: false
+        })).toBe('');
+        expect(appendManifestToUserContent('hi', formatSourcesEmptyBlock())).toContain('hi');
     });
 });
 
@@ -414,7 +441,7 @@ describe('convert', () => {
 });
 
 describe('images', () => {
-    test('MIME normalization, take-once, and Redis absent', async () => {
+    test('MIME normalization, peek, and Redis absent', async () => {
         expect(normalizeImageMime('image/jpg')).toBe('image/jpeg');
         expect(isAllowedImageMime('image/png')).toBe(true);
         expect(isAllowedImageMime('application/pdf')).toBe(false);
@@ -424,7 +451,7 @@ describe('images', () => {
         const first = await takeStagedImage('jdoe', 't1', 'img-1', redis);
         expect(first.data).toBe('abc');
         const second = await takeStagedImage('jdoe', 't1', 'img-1', redis);
-        expect(second).toBe(null);
+        expect(second.data).toBe('abc');
     });
 
     test('send-time gating uses the thread model; content parts stay in order', async () => {
@@ -470,12 +497,64 @@ describe('images', () => {
         expect(await deleteStagedThread('jdoe', 't1', redis)).toBe(0);
     });
 
-    test('takeStagedImages deletes the mailbox', async () => {
+    test('takeStagedImages peeks and leaves the mailbox', async () => {
         const redis = memoryRedis();
         await stageImage('jdoe', 't1', 'img-1', { data: 'x', mimeType: 'image/png' }, {}, redis);
         const taken = await takeStagedImages('jdoe', 't1', [{ id: 'img-1', name: 'x' }], redis);
         expect(taken[0].data).toBe('x');
+        expect((await takeStagedImage('jdoe', 't1', 'img-1', redis)).data).toBe('x');
+        expect(await threadHasStagedImages('jdoe', 't1', redis)).toBe(true);
+    });
+
+    test('a follow-up openUserContent still sees the picture', async () => {
+        const redis = memoryRedis();
+        await stageImage('jdoe', 't1', 'img-1', { data: 'abc', mimeType: 'image/png', name: 'shot.png' }, {}, redis);
+        const first = await openUserContent({
+            userText: 'Look',
+            images: [{ id: 'img-1', name: 'shot.png', mimeType: 'image/png', width: 10, height: 8 }],
+            actor: testActor(),
+            threadId: 't1',
+            redisManager: redis
+        }, { imagesEnabled: true }, { capabilities: { vision: true } });
+        const second = await openUserContent({
+            userText: 'Again',
+            images: [{ id: 'img-1', name: 'shot.png', mimeType: 'image/png', width: 10, height: 8 }],
+            actor: testActor(),
+            threadId: 't1',
+            redisManager: redis
+        }, { imagesEnabled: true }, { capabilities: { vision: true } });
+        expect(first.find((part) => part.type === 'image').data).toBe('abc');
+        expect(second.find((part) => part.type === 'image').data).toBe('abc');
+        expect(second[0].text).toContain('Again');
+    });
+
+    test('deleteStagedImage removes one image and leaves the sibling', async () => {
+        const redis = memoryRedis();
+        await stageImage('jdoe', 't1', 'img-1', { data: 'x', mimeType: 'image/png' }, {}, redis);
+        await stageImage('jdoe', 't1', 'img-2', { data: 'y', mimeType: 'image/png' }, {}, redis);
+        await deleteStagedImage('jdoe', 't1', 'img-1', redis);
         expect(await takeStagedImage('jdoe', 't1', 'img-1', redis)).toBe(null);
+        expect((await takeStagedImage('jdoe', 't1', 'img-2', redis)).data).toBe('y');
+        expect(await threadHasStagedImages('jdoe', 't1', redis)).toBe(true);
+        await deleteStagedImage('jdoe', 't1', 'img-2', redis);
+        expect(await threadHasStagedImages('jdoe', 't1', redis)).toBe(false);
+    });
+
+    test('delete after peek removes bytes a later send would have used', async () => {
+        const redis = memoryRedis();
+        await stageImage('jdoe', 't1', 'img-1', { data: 'abc', mimeType: 'image/png', name: 'shot.png' }, {}, redis);
+        await takeStagedImages('jdoe', 't1', [{ id: 'img-1' }], redis);
+        await deleteStagedImage('jdoe', 't1', 'img-1', redis);
+        const after = await openUserContent({
+            userText: 'Gone',
+            images: [{ id: 'img-1', name: 'shot.png', mimeType: 'image/png' }],
+            actor: testActor(),
+            threadId: 't1',
+            redisManager: redis
+        }, { imagesEnabled: true }, { capabilities: { vision: true } });
+        const imagePart = Array.isArray(after) ? after.find((part) => part.type === 'image') : null;
+        expect(imagePart).toBeFalsy();
+        expect(String(Array.isArray(after) ? after[0].text : after)).toContain('Gone');
     });
 });
 

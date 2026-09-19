@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -55,6 +55,7 @@ import {
 import {
     clientFetchMessage,
     convertDocument,
+    deleteStagedImage,
     deleteStagedThread,
     converterMimeList,
     maxConvertBytesOf,
@@ -237,6 +238,8 @@ class AiCoreController {
             bodyMode: 'stream',
             bodyLimit: '25mb'
         },
+        { method: 'DELETE', path: '/api/1/ai/thread/:id/image/:imageId', handler: 'apiDeleteStagedImage', auth: 'user' },
+        { method: 'DELETE', path: '/api/1/ai/thread/:id/images', handler: 'apiDeleteStagedImages', auth: 'user' },
         { method: 'POST', path: '/api/1/ai/thread', handler: 'apiCreateThread', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread', handler: 'apiListThreads', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread/:id', handler: 'apiGetThread', auth: 'user' },
@@ -1153,6 +1156,65 @@ class AiCoreController {
             logErr(req, 'aiCore.apiStageImage', actorGuess, error);
             const status = error.code === 'AI_NO_REDIS' ? 503 : 500;
             return sendError(req, res, status, error.message || 'Failed to stage image', error.code || 'AI_IMAGE_STAGE');
+        }
+    }
+
+    static async apiDeleteStagedImage(req, res) {
+        const actorGuess = actorFromRequest(req);
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiDeleteStagedImage', actor);
+            const threadId = req.params.id;
+            const imageId = req.params.imageId;
+            if (!threadId || !imageId) {
+                return sendError(req, res, 400, 'Thread id and image id are required', 'AI_BAD_ARGS');
+            }
+            const thread = await this._ownedThread(req, actor, threadId);
+            if (thread == null) {
+                return sendError(req, res, 404, 'Thread not found', 'AI_THREAD_NOT_FOUND');
+            }
+            if (thread === false) {
+                return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
+            }
+            await deleteStagedImage(threadOwner(actor), String(thread._id), imageId);
+            res.json({ success: true, data: { id: imageId } });
+            logOk(req, 'aiCore.apiDeleteStagedImage', actor, imageId);
+        } catch (error) {
+            logErr(req, 'aiCore.apiDeleteStagedImage', actorGuess, error);
+            return sendError(req, res, 500, error.message || 'Failed to delete image', 'AI_IMAGE_DELETE');
+        }
+    }
+
+    static async apiDeleteStagedImages(req, res) {
+        const actorGuess = actorFromRequest(req);
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiDeleteStagedImages', actor);
+            const threadId = req.params.id;
+            if (!threadId) {
+                return sendError(req, res, 400, 'Thread id is required', 'AI_BAD_ARGS');
+            }
+            const thread = await this._ownedThread(req, actor, threadId);
+            if (thread == null) {
+                return sendError(req, res, 404, 'Thread not found', 'AI_THREAD_NOT_FOUND');
+            }
+            if (thread === false) {
+                return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
+            }
+            const deleted = await deleteStagedThread(threadOwner(actor), String(thread._id));
+            res.json({ success: true, data: { images: deleted } });
+            logOk(req, 'aiCore.apiDeleteStagedImages', actor, `${deleted} images`);
+        } catch (error) {
+            logErr(req, 'aiCore.apiDeleteStagedImages', actorGuess, error);
+            return sendError(req, res, 500, error.message || 'Failed to delete images', 'AI_IMAGE_DELETE');
         }
     }
 

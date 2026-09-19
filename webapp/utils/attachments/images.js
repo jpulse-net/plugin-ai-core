@@ -1,9 +1,9 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Attachments / Images
  * @tagline         Redis image mailbox and content parts
- * @description     MIME allowlist, staging, take-once, and user-message parts
+ * @description     MIME allowlist, staging, peek-until-cleared, and user-message parts
  * @file            plugins/ai-core/webapp/utils/attachments/images.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -184,20 +184,20 @@ export async function stageImage(username, threadId, imageId, entry, settings, r
     await redis.cacheSetObject(IMAGE_INDEX_PATH, indexKey, { ids }, { ttl });
 }
 
-export async function takeStagedImage(username, threadId, imageId, redisManager) {
+export async function takeStagedImage(username, threadId, imageId, redisManager, settings) {
     const redis = redisManager || global.RedisManager;
     const key = imageStageKey(username, threadId, imageId);
     if (!redis || typeof redis.cacheGetObject !== 'function') {
         return null;
     }
     const entry = await redis.cacheGetObject(IMAGE_CACHE_PATH, key);
-    if (typeof redis.cacheDel === 'function') {
-        await redis.cacheDel(IMAGE_CACHE_PATH, key);
+    if (entry && typeof entry === 'object' && typeof redis.cacheSetObject === 'function') {
+        await redis.cacheSetObject(IMAGE_CACHE_PATH, key, entry, { ttl: imageStageTtlOf(settings) });
     }
     return entry && typeof entry === 'object' ? entry : null;
 }
 
-export async function takeStagedImages(username, threadId, images, redisManager) {
+export async function takeStagedImages(username, threadId, images, redisManager, settings) {
     const list = Array.isArray(images) ? images : [];
     const staged = [];
     for (const img of list) {
@@ -205,7 +205,7 @@ export async function takeStagedImages(username, threadId, images, redisManager)
         if (!id) {
             continue;
         }
-        const entry = await takeStagedImage(username, threadId, id, redisManager);
+        const entry = await takeStagedImage(username, threadId, id, redisManager, settings);
         if (!entry) {
             continue;
         }
@@ -219,8 +219,12 @@ export async function takeStagedImages(username, threadId, images, redisManager)
         });
     }
     const redis = redisManager || global.RedisManager;
-    if (redis && typeof redis.cacheDel === 'function') {
-        await redis.cacheDel(IMAGE_INDEX_PATH, imageIndexKey(username, threadId));
+    if (redis && typeof redis.cacheGetObject === 'function') {
+        const indexKey = imageIndexKey(username, threadId);
+        const existing = await redis.cacheGetObject(IMAGE_INDEX_PATH, indexKey);
+        if (existing && typeof redis.cacheSetObject === 'function') {
+            await redis.cacheSetObject(IMAGE_INDEX_PATH, indexKey, existing, { ttl: imageStageTtlOf(settings) });
+        }
     }
     return staged;
 }

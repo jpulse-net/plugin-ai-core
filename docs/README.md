@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.8
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.9
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -222,7 +222,7 @@ The convert and image-stage routes accept up to 25 MB (`bodyLimit: '25mb'`; ngin
 
 A setting above 25 MB is clamped. Conversion buffers the whole file in memory, so a busy site lowers `maxConvertBytes` rather than raising the heap. The panel refuses an oversize file before uploading it.
 
-Images are `POST /api/1/ai/image/stage`, also streaming. Bytes park in Redis, scoped to the user, thread, and image id, and are read once at send. Redis is required for images; the capability probe reports them unavailable and the panel hides the affordance when Redis is down. Gating is at send, against the thread's model, not at attach against the site default.
+Images are `POST /api/1/ai/image/stage`, also streaming. Bytes park in Redis, scoped to the user, thread, and image id. The picture stays on the strip and is read on every send until the chip is cleared (✕, `/new`, thread switch, or reload). Send does not consume the chip or the mailbox. ✕ is `DELETE /api/1/ai/thread/:id/image/:imageId`; `/new` and thread switch are `DELETE /api/1/ai/thread/:id/images`. Redis is required for images; the capability probe reports them unavailable and the panel hides the affordance when Redis is down. Gating is at send, against the thread's model, not at attach against the site default.
 
 A site tool that returns a picture puts it in `data.media`. The envelope lifts that field out of `data` so the tool-result message stays text. How many images one turn may pull in is an ordinary `budget` on the site's tool.
 

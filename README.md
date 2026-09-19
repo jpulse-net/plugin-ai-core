@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.8
+# jPulse Framework / Plugins / AI Core Plugin v1.0.9
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.9: Image chips stay on Send, same as text and URL chips. The Redis mailbox peeks and is deleted only on ✕, `/new`, thread switch, or reload.
 - 1.0.8: `create({ title })` sets the toolbar label. `storageKey`, `cascade`, and `group` are forwarded to the float panel. `create()` returns `destroy()` that removes the body node and closes the per-thread WebSocket. Compose paste of text stays in the box; only clipboard files and images become chips. This turn's source/image list is on the user message; earlier filenames are stale. The (+) attach menu flips to stay inside the panel. Enter on rename does not bubble.
 - 1.0.7: Convert and image uploads honor Site Configuration → AI (`maxConvertBytes` default 25 MB under a 25mb route ceiling). `AiCore.deleteByScope` wipes a deleted object's conversations. Site-wide `defaultToolTimeoutMs` (10000). Reserved `list_sources` / `get_source` refused with a warning. `handle.attachments()` replaces `sources` / `images` / `sourceFile`.
 - 1.0.6: Hello AI extracted as a bundled companion plugin. `bundle.members` is `ai-mock` + `hello-ai`. Disable Hello AI to hide the demo without turning off AI.

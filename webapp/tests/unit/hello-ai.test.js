@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -313,6 +313,12 @@ describe('adapter contract scan', () => {
         expect(panel).toMatch(
             /els\.input\.addEventListener\('paste', async \(event\) => \{[\s\S]*?clipboardData\.files[\s\S]*?if \(!files\.length\) \{\s*return;/
         );
+        expect(panel).toMatch(/await transport\.startTurn\(threadId, body\);\n            \} catch/);
+        expect(panel).not.toMatch(/await transport\.startTurn\(threadId, body\);\n                state\.images = \[\]/);
+        expect(panel).toMatch(/async function clearAttachments\(\)/);
+        expect(panel).toMatch(/state\.sources = \[\];\n            state\.images = \[\];/);
+        expect(panel).toMatch(/\/api\/1\/ai\/thread\/\$\{encodeURIComponent\(threadId\)\}\/images/);
+        expect(panel).toMatch(/\/image\/\$\{encodeURIComponent\(id\)\}/);
         const stub = {
             toolData() { return {}; },
             describeContext() { return 'context'; },
@@ -331,6 +337,21 @@ describe('adapter contract scan', () => {
             'toolData',
             'undoProposal'
         ]);
+    });
+
+    test('hello-ai has no propose_image; that contract lives on the panel handle', () => {
+        const helloCtrl = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/hello-ai/webapp/controller/helloAi.js'),
+            'utf8'
+        );
+        expect(helloCtrl).not.toMatch(/propose_image/);
+        expect(helloCtrl).toMatch(/propose_draft_rewrite/);
+        const panel = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js'),
+            'utf8'
+        );
+        expect(panel).toMatch(/handle\.attachments = panelApi\.attachments/);
+        expect(panel).toMatch(/handle\.attachmentFile = panelApi\.attachmentFile/);
     });
 });
 

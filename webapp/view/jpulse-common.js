@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.8
+ * @version         1.0.9
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -1648,13 +1648,21 @@ if (!window.jPulse) {
             ].join('');
         }
 
-        function clearAttachments() {
+        async function clearAttachments() {
+            const threadId = state.threadId;
             state.sources = [];
             state.images = [];
             panelStore.files.clear();
             hideIntercept();
             syncStore();
             renderStrip();
+            if (threadId) {
+                try {
+                    await jPulse.api.delete(`/api/1/ai/thread/${encodeURIComponent(threadId)}/images`);
+                } catch (_err) {
+                    /* mailbox TTL is the fallback */
+                }
+            }
         }
 
         function sourceRefsBadge(turn) {
@@ -1937,7 +1945,7 @@ if (!window.jPulse) {
         async function openThread(threadId, options) {
             const sameThread = String(threadId || '') === state.threadId;
             if (!sameThread) {
-                clearAttachments();
+                await clearAttachments();
             }
             state.threadId = String(threadId || '');
             if (!(options && options.keepLocals && sameThread)) {
@@ -2387,7 +2395,7 @@ if (!window.jPulse) {
                 showToast(res.error || I18N.error, 'error');
                 return;
             }
-            clearAttachments();
+            await clearAttachments();
             await refreshThreads();
             await openThread(res.data._id);
         }
@@ -2444,9 +2452,6 @@ if (!window.jPulse) {
             }
             try {
                 await transport.startTurn(threadId, body);
-                state.images = [];
-                syncStore();
-                renderStrip();
             } catch (error) {
                 setRunning(false);
                 showToast(error.message || I18N.error, 'error');
@@ -2824,6 +2829,11 @@ if (!window.jPulse) {
                     syncStore();
                     renderStrip();
                     refreshCapability();
+                    if (state.threadId && id) {
+                        jPulse.api.delete(
+                            `/api/1/ai/thread/${encodeURIComponent(state.threadId)}/image/${encodeURIComponent(id)}`
+                        ).catch(() => {});
+                    }
                     return;
                 }
                 const srcChip = event.target.closest('[data-src]');
