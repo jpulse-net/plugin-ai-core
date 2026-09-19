@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.7
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.8
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -111,6 +111,9 @@ Modules are served at `GET /api/1/ai/tool-module/:hash/:name.js` (`auth: user`, 
 jPulse.ai.panel.create({
     scopeType: 'doc',
     scopeId:   docId,
+    title:     'AI Agent',
+    storageKey: 'aiAgent:window',
+    cascade:   true,
     adapter: {
         toolData(name) { … },
         describeContext() { … },
@@ -125,6 +128,8 @@ jPulse.ai.panel.create({
 ```
 
 `adapter` may be omitted. `toolData` plus `describeContext` / `describeTarget` are enough for a read-only agent. Scope labels belong on `onAiScopeResolve`, not the adapter. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`. `contextOptions()` is optional: implement it and the panel shows a context row and `/context`; omit it and neither appears.
+
+`title` is the toolbar label. A non-empty string replaces the i18n default ("AI chat"). Create-time only. `storageKey`, `cascade`, and `group` are forwarded to `jPulse.UI.floatPanel.create()`; omit them and the shell defaults apply (`jp:floatPanel:<id>`, no cascade, group `default`). Cascade occupancy is every registered panel's `x` / `y`, not open-only and not same-group — a closed chat created on page load still occupies the default corner. `group` is only `mobile.exclusive`; forwarding it does nothing until exclusive is on. Any parseable JSON at `storageKey` skips cascade; a leftover blob without `x` / `y` / `w` / `h` / `open` still counts. Clear it once or rewrite it in that shape. The rest of the create bag is not spread into the shell. `create()` returns `destroy()`: it unregisters the float panel, closes the per-thread WebSocket (a no-op when the probe stayed on HTTP), and removes the body node (`create()` always appends one). A site only calls `destroy()`; it does not close `/api/1/ws/ai/:threadId` itself. A second call is a no-op. Compose paste of text stays in the textarea. Only clipboard files and images become chips. Attach a text source with drop or the (+) menu. The (+) attach menu opens to the right when the (+) is in the left half of the panel, and to the left when it is in the right half.
 
 `get_source` and `list_sources` are owned by the panel. The client bridge asks a panel-internal provider before `adapter.toolData`, so a site with no adapter still gets working sources. Those two names are reserved: a site registration is refused, the panel's tools stay, and `/tools` shows the collision as withheld (`reserved`). It does not throw.
 
@@ -199,9 +204,9 @@ The sample is a separate bundled plugin. Open [`/hello-ai/`](/hello-ai/) or disa
 
 ## Attachments
 
-Sources stay on this tab and this conversation. A reload clears the chips. What survives is a `sourceRefs` badge on the turn: the evidence that external text entered, not the text itself. Hover a chip for a tooltip; click it for name, origin, URL, type, and size, with copy. File, URL, and image chips use a type icon. The plus button wraps on the same row as the last chip.
+Sources stay on this tab and this conversation. A reload clears the chips. What survives is a `sourceRefs` badge on the turn: the evidence that external text entered, not the text itself. Hover a chip for a tooltip; click it for name, origin, URL, type, and size, with copy. File, URL, and image chips use a type icon. The plus button wraps on the same row as the last chip. Pasting text into the compose box leaves it in the box. Clipboard files and images become chips. A text source is drop or the (+) menu, not compose paste.
 
-The model never sees source text in the prompt. It sees a metadata manifest and reads through `list_sources` / `get_source` — outline first, then a section or a character window. Text comes back inside `<<<SOURCE …>>>` markers. The safety fragment already calls that a quotation, not a request.
+The model never sees source text in the prompt. It sees a metadata manifest **on this turn's user message** and reads through `list_sources` / `get_source` — outline first, then a section or a character window. Filenames in earlier replies are stale. Text comes back inside `<<<SOURCE …>>>` markers. The safety fragment already calls that a quotation, not a request.
 
 URL ingest is `POST /api/1/ai/source/fetch` on the framework `UrlFetch` helper. Host, size, and timeout caps are on Site Configuration → AI. A URL in the compose box offers to fetch it before the turn starts. The offer is hidden when the prompt is a question about the link rather than a request to read it. There is no agent-callable fetch. A listed URL is already ingested — the model reads that copy; it cannot fetch the live web. After a reload, chips are gone; ask the user to attach the file or URL again.
 

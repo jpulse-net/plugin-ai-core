@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Attachments
  * @tagline         Sources, ingest, convert, images, and loop purity
  * @file            plugins/ai-core/webapp/tests/unit/attachments.test.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -172,6 +172,7 @@ describe('manifest', () => {
             text: 'SECRET'
         }]);
         expect(block).toContain('get_source');
+        expect(block).toContain('Sources attached this turn');
         expect(block).toContain('already ingested');
         expect(block).not.toContain('SECRET');
         expect(formatSourcesBlock([])).toBe('');
@@ -443,7 +444,10 @@ describe('images', () => {
             redisManager: redis
         }, { imagesEnabled: true }, { capabilities: { vision: true } });
         expect(Array.isArray(parts)).toBe(true);
-        expect(parts[0]).toEqual({ type: 'text', text: 'What is this?' });
+        expect(parts[0].type).toBe('text');
+        expect(parts[0].text).toContain('What is this?');
+        expect(parts[0].text).toContain('Images attached to this turn');
+        expect(parts[0].text).toContain('shot.png');
         expect(parts[1].type).toBe('text');
         expect(parts[2].type).toBe('image');
         expect(parts[2].data).toBe('abc');
@@ -453,7 +457,7 @@ describe('images', () => {
             actor: testActor(),
             threadId: 't1',
             redisManager: redis
-        }, { imagesEnabled: true }, { capabilities: { vision: false } });
+        }, { imagesEnabled: true, sourcesEnabled: false }, { capabilities: { vision: false } });
         expect(gated).toBe('What is this?');
     });
 
@@ -511,7 +515,7 @@ describe('data.media', () => {
 });
 
 describe('prompt and refs', () => {
-    test('empty sources add no block; refs stay metadata', async () => {
+    test('live list is on this turn\'s user message; earlier names are stale', async () => {
         const empty = await assemblePrompt({
             actor: testActor(),
             scope: { nouns: { item: 'item', container: 'scope' } },
@@ -520,6 +524,7 @@ describe('prompt and refs', () => {
             hookManager: createHookManager()
         });
         expect(empty.system).not.toMatch(/Sources attached/);
+        expect(empty.system).toContain('earlier replies are stale');
         const noneAttached = await assemblePrompt({
             actor: testActor(),
             scope: { nouns: { item: 'item', container: 'scope' } },
@@ -531,18 +536,37 @@ describe('prompt and refs', () => {
             sources: [],
             hookManager: createHookManager()
         });
-        expect(noneAttached.system).toContain('vanish on a page reload');
-        expect(noneAttached.system).toContain('Do not say you lack file or web access');
+        expect(noneAttached.system).not.toContain('vanish on a page reload');
         const withSrc = await assemblePrompt({
             actor: testActor(),
             scope: { nouns: { item: 'note', container: 'scope' } },
             tools: [{ name: 'get_source' }],
-            sources: [{ id: 'a', name: 'Doc', mimeType: 'text/plain', chars: 4, sections: 1, text: 'NOPE' }],
+            sources: [{ id: 'a', name: 'Copyright.txt', mimeType: 'text/plain', chars: 419, sections: 1, text: 'NOPE' }],
             hookManager: createHookManager()
         });
-        expect(withSrc.system).toContain('get_source');
+        expect(withSrc.system).not.toContain('Copyright.txt');
         expect(withSrc.system).not.toContain('NOPE');
-        expect(withSrc.system).toContain('note');
+        expect(withSrc.system).toContain('earlier replies are stale');
+        const listed = await openUserContent({
+            userText: 'check again, you should see the test.txt file',
+            sources: [{ id: 'b', name: 'test.txt', mimeType: 'text/plain', chars: 399, sections: 1, text: 'SECRET' }],
+            actor: testActor(),
+            scope: { nouns: { item: 'note', container: 'scope' } }
+        }, { sourcesEnabled: true }, {});
+        expect(listed).toContain('check again, you should see the test.txt file');
+        expect(listed).toContain('Sources attached this turn');
+        expect(listed).toContain('test.txt');
+        expect(listed).toContain('note');
+        expect(listed).not.toContain('SECRET');
+        expect(listed).not.toContain('Copyright.txt');
+        const emptyUser = await openUserContent({
+            userText: '/sources',
+            sources: [],
+            actor: testActor()
+        }, { sourcesEnabled: true }, {});
+        expect(emptyUser).toContain('/sources');
+        expect(emptyUser).toContain('vanish on a page reload');
+        expect(emptyUser).toContain('Filenames in earlier replies are stale');
         expect(formatImagesBlock([{ id: 'i', name: 'shot', mimeType: 'image/png', width: 8, height: 6 }])).toContain('8×6');
         const refs = refsForTurn({
             sources: [{ id: 'a', name: 'Doc', origin: 'file', mimeType: 'text/plain', text: 'secret' }],

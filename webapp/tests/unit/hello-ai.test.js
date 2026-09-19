@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -286,6 +286,32 @@ describe('adapter contract scan', () => {
         expect(panel).not.toMatch(/const SLASH_COMMANDS = \['help'/);
         expect(panel).toMatch(
             /async function openThread\(threadId, options\) \{[\s\S]*?await refreshThreads\(\);[\s\S]*?\/turns/
+        );
+        expect(panel).toMatch(/typeof options\.title === 'string'/);
+        expect(panel).toMatch(/storageKey: options\.storageKey/);
+        expect(panel).toMatch(/cascade: options\.cascade/);
+        expect(panel).toMatch(/group: options\.group/);
+        const cssPath = path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.css');
+        const css = fs.readFileSync(cssPath, 'utf8');
+        const addMenu = css.match(/\.plg-ai-add-menu\s*\{[^}]+\}/);
+        expect(addMenu).toBeTruthy();
+        expect(addMenu[0]).toMatch(/left:\s*0/);
+        expect(addMenu[0]).not.toMatch(/right:\s*0/);
+        expect(panel).toMatch(/function positionAddMenu\(\)/);
+        expect(panel).toMatch(/addRect\.left \+ addRect\.width \/ 2/);
+        expect(panel).toMatch(/style\.right = '0px'/);
+        expect(panel).toMatch(
+            /if \(event\.key === 'Enter'\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*saveRename\(\);/
+        );
+        expect(panel).toMatch(/function destroy\(\)/);
+        expect(panel).toMatch(/root\.parentNode\.removeChild\(root\)/);
+        expect(panel).toMatch(/destroy: destroy/);
+        expect(panel).toMatch(/function disconnectWs\(\)/);
+        expect(panel).toMatch(/transport\.disconnect\(\)/);
+        expect(panel).toMatch(/disconnect: disconnectWs/);
+        expect(panel).not.toMatch(/text\.length > 400/);
+        expect(panel).toMatch(
+            /els\.input\.addEventListener\('paste', async \(event\) => \{[\s\S]*?clipboardData\.files[\s\S]*?if \(!files\.length\) \{\s*return;/
         );
         const stub = {
             toolData() { return {}; },

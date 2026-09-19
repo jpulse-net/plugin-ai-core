@@ -3,8 +3,8 @@
  * @tagline         Sources, ingest, convert, and image staging
  * @description     Prompt manifests, UrlFetch mapping, converter call path, Redis mailbox
  * @file            plugins/ai-core/webapp/utils/attachments/index.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -163,7 +163,7 @@ export function formatSourcesBlock(sources, labels) {
     }
     const noun = (labels && labels.item) || 'source';
     const tool = 'get_source';
-    const lines = [`Sources attached to this conversation (read with ${tool}):`];
+    const lines = [`Sources attached this turn (read with ${tool}):`];
     for (const src of sources) {
         const s = src || {};
         const sections = Number.isFinite(Number(s.sections))
@@ -185,7 +185,52 @@ export function formatSourcesBlock(sources, labels) {
 }
 
 export function formatSourcesEmptyBlock() {
-    return 'No file or URL is attached in this browser tab. The user attaches sources (drop, paste, or Add URL); they vanish on a page reload. You cannot open disk files or fetch the live web yourself. Do not say you lack file or web access as a capability — ask the user to attach the file or URL again, then read it with list_sources and get_source.';
+    return 'No file or URL is attached this turn. The user attaches sources (drop, Add file, or Add URL); they vanish on a page reload. Filenames in earlier replies are stale. You cannot open disk files or fetch the live web yourself. Do not say you lack file or web access as a capability — ask the user to attach the file or URL again, then read it with list_sources and get_source.';
+}
+
+export function formatTurnAttachmentManifest(opts) {
+    const sources = (opts && opts.sources) || [];
+    const images = (opts && opts.images) || [];
+    const labels = opts && opts.labels;
+    const sourcesOn = !opts || opts.sourcesEnabled !== false;
+    const imagesOn = opts && opts.includeImages === true && images.length > 0;
+    const parts = [];
+    if (sourcesOn) {
+        parts.push(formatSourcesBlock(sources, labels) || formatSourcesEmptyBlock());
+    }
+    if (imagesOn) {
+        const block = formatImagesBlock(images);
+        if (block) {
+            parts.push(block);
+        }
+    }
+    return parts.join('\n\n');
+}
+
+export function appendManifestToUserContent(content, manifest) {
+    const extra = String(manifest || '').trim();
+    if (!extra) {
+        return content;
+    }
+    if (content == null || content === '') {
+        return extra;
+    }
+    if (typeof content === 'string') {
+        return `${content}\n\n${extra}`;
+    }
+    if (!Array.isArray(content)) {
+        return content;
+    }
+    const parts = content.slice();
+    const first = parts[0];
+    if (first && first.type === 'text' && typeof first.text === 'string') {
+        parts[0] = {
+            type: 'text',
+            text: first.text ? `${first.text}\n\n${extra}` : extra
+        };
+        return parts;
+    }
+    return [{ type: 'text', text: extra }].concat(parts);
 }
 
 export function formatImagesBlock(images) {

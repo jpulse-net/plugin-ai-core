@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -655,19 +655,25 @@ if (!window.jPulse) {
             reply({ success: true, data: result });
         }
 
+        function disconnectWs() {
+            if (!wsConn) {
+                return;
+            }
+            const previous = wsConn;
+            wsConn = null;
+            previous._aiIgnoreStatus = true;
+            if (typeof previous.disconnect === 'function') {
+                previous.disconnect();
+            }
+        }
+
         async function connectWs(threadId) {
             const path = `/api/1/ws/ai/${threadId}`;
             if (wsConn && wsConn.path === path) {
                 await waitForWs(wsConn);
                 return wsConn;
             }
-            if (wsConn) {
-                const previous = wsConn;
-                previous._aiIgnoreStatus = true;
-                if (typeof previous.disconnect === 'function') {
-                    previous.disconnect();
-                }
-            }
+            disconnectWs();
             const conn = jPulse.ws.connect(path);
             conn.path = path;
             wsConn = conn;
@@ -761,6 +767,7 @@ if (!window.jPulse) {
             probe: probe,
             startTurn: startTurn,
             connectWs: connectWs,
+            disconnect: disconnectWs,
             getCapability: () => capability
         };
     }
@@ -772,6 +779,9 @@ if (!window.jPulse) {
         const catalog = normalizeCatalog(options.commands);
         const siteRegions = mergeRegions(options.regions);
         const panelId = options.id || `ai-panel-${scopeType}-${scopeId}`;
+        const title = (typeof options.title === 'string' && options.title.trim())
+            ? options.title
+            : I18N.title;
         const threadKey = `jp:ai:thread:${scopeType}:${scopeId}`;
         const panelStore = { sources: [], images: [], files: new Map(), caps: {} };
         const transport = createTransport({
@@ -793,11 +803,11 @@ if (!window.jPulse) {
         root.className = 'plg-ai-panel';
         root.innerHTML = [
             '<div class="plg-ai-toolbar" data-jp-panel-drag>',
-            `  <strong class="plg-ai-title">${escapeHtml(I18N.title)}</strong>`,
+            `  <strong class="plg-ai-title">${escapeHtml(title)}</strong>`,
             `  <button type="button" class="plg-ai-close jp-float-panel-header-btn" data-jp-panel-close aria-label="×">×</button>`,
             '</div>',
             '<div class="plg-ai-thread-row">',
-            `  <select class="plg-ai-thread-select jp-form-select" aria-label="${escapeHtml(I18N.title)}"></select>`,
+            `  <select class="plg-ai-thread-select jp-form-select" aria-label="${escapeHtml(title)}"></select>`,
             `  <input type="text" class="plg-ai-thread-edit jp-form-input" hidden aria-label="${escapeHtml(I18N.rename)}">`,
             `  <button type="button" class="plg-ai-rename jp-btn jp-btn-sm" title="${escapeHtml(I18N.rename)}" aria-label="${escapeHtml(I18N.rename)}">`,
             '    <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.6 1.6a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7l-8.2 8.2L3 14l1.4-3.2 8.2-8.2z"/></svg>',
@@ -852,6 +862,9 @@ if (!window.jPulse) {
             minWidth: 320,
             minHeight: 360,
             launcher: options.launcher,
+            storageKey: options.storageKey,
+            cascade: options.cascade,
+            group: options.group,
             onOpen: function () {
                 pinMessages();
             }
@@ -859,18 +872,19 @@ if (!window.jPulse) {
         const launcherEl = typeof options.launcher === 'string'
             ? document.querySelector(options.launcher)
             : options.launcher;
+        function onLauncherClick() {
+            if (typeof handle.toggle === 'function') {
+                handle.toggle();
+                return;
+            }
+            if (handle.isOpen && handle.isOpen()) {
+                handle.close();
+                return;
+            }
+            handle.open();
+        }
         if (handle && launcherEl && typeof launcherEl.addEventListener === 'function') {
-            launcherEl.addEventListener('click', () => {
-                if (typeof handle.toggle === 'function') {
-                    handle.toggle();
-                    return;
-                }
-                if (handle.isOpen && handle.isOpen()) {
-                    handle.close();
-                    return;
-                }
-                handle.open();
-            });
+            launcherEl.addEventListener('click', onLauncherClick);
         }
 
         const state = {
@@ -2647,9 +2661,28 @@ if (!window.jPulse) {
         function hideAddMenu() {
             if (els.addMenu) {
                 els.addMenu.hidden = true;
+                els.addMenu.style.left = '';
+                els.addMenu.style.right = '';
             }
             if (els.add) {
                 els.add.setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        function positionAddMenu() {
+            if (!els.addMenu || !els.add) {
+                return;
+            }
+            const clip = (root.closest && root.closest('.jp-float-panel')) || root;
+            const clipRect = clip.getBoundingClientRect();
+            const addRect = els.add.getBoundingClientRect();
+            const onRight = addRect.left + addRect.width / 2 >= clipRect.left + clipRect.width / 2;
+            if (onRight) {
+                els.addMenu.style.left = 'auto';
+                els.addMenu.style.right = '0px';
+            } else {
+                els.addMenu.style.left = '0px';
+                els.addMenu.style.right = 'auto';
             }
         }
 
@@ -2662,8 +2695,14 @@ if (!window.jPulse) {
             if (els.add) {
                 els.add.setAttribute('aria-expanded', open ? 'true' : 'false');
             }
-            if (open && jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.closeActive === 'function') {
-                jPulse.UI.tooltip.closeActive();
+            if (open) {
+                positionAddMenu();
+                if (jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.closeActive === 'function') {
+                    jPulse.UI.tooltip.closeActive();
+                }
+            } else {
+                els.addMenu.style.left = '';
+                els.addMenu.style.right = '';
             }
         }
 
@@ -2744,7 +2783,7 @@ if (!window.jPulse) {
                 }
             });
         }
-        document.addEventListener('click', (event) => {
+        function onDocumentClick(event) {
             const target = event.target;
             if (els.addMenu && !els.addMenu.hidden
                 && !(target.closest && target.closest('.plg-ai-strip-add'))) {
@@ -2754,13 +2793,15 @@ if (!window.jPulse) {
                 && !(target.closest && (target.closest('.plg-ai-chip-pop') || target.closest('.plg-ai-chip')))) {
                 hideChipPop();
             }
-        });
-        document.addEventListener('keydown', (event) => {
+        }
+        function onDocumentKeydown(event) {
             if (event.key === 'Escape') {
                 hideAddMenu();
                 hideChipPop();
             }
-        });
+        }
+        document.addEventListener('click', onDocumentClick);
+        document.addEventListener('keydown', onDocumentKeydown);
         if (els.chips) {
             els.chips.addEventListener('click', (event) => {
                 const removeSrc = event.target.closest('[data-remove]');
@@ -2945,17 +2986,12 @@ if (!window.jPulse) {
         });
         els.input.addEventListener('paste', async (event) => {
             const files = Array.from((event.clipboardData && event.clipboardData.files) || []);
-            if (files.length) {
-                event.preventDefault();
-                for (const file of files) {
-                    await addDroppedFile(file, { origin: 'paste' });
-                }
+            if (!files.length) {
                 return;
             }
-            const text = event.clipboardData && event.clipboardData.getData('text/plain');
-            if (text && text.length > 400 && !extractPromptUrl(text)) {
-                event.preventDefault();
-                addTextSource(text, { origin: 'paste', mimeType: 'text/plain' });
+            event.preventDefault();
+            for (const file of files) {
+                await addDroppedFile(file, { origin: 'paste' });
             }
         });
         if (els.contextSelect) {
@@ -2975,6 +3011,7 @@ if (!window.jPulse) {
         els.threadEdit.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
+                event.stopPropagation();
                 saveRename();
                 return;
             }
@@ -3012,6 +3049,30 @@ if (!window.jPulse) {
             }
         })();
 
+        const floatDestroy = handle && typeof handle.destroy === 'function'
+            ? handle.destroy.bind(handle)
+            : null;
+        let destroyed = false;
+        function destroy() {
+            if (destroyed) {
+                return;
+            }
+            destroyed = true;
+            if (transport && typeof transport.disconnect === 'function') {
+                transport.disconnect();
+            }
+            document.removeEventListener('click', onDocumentClick);
+            document.removeEventListener('keydown', onDocumentKeydown);
+            if (launcherEl && typeof launcherEl.removeEventListener === 'function') {
+                launcherEl.removeEventListener('click', onLauncherClick);
+            }
+            if (floatDestroy) {
+                floatDestroy();
+            }
+            if (root && root.parentNode) {
+                root.parentNode.removeChild(root);
+            }
+        }
         const panelApi = {
             handle: handle,
             root: root,
@@ -3024,11 +3085,13 @@ if (!window.jPulse) {
             },
             attachmentFile: function (id) {
                 return panelStore.files.get(id) || null;
-            }
+            },
+            destroy: destroy
         };
         if (handle) {
             handle.attachments = panelApi.attachments;
             handle.attachmentFile = panelApi.attachmentFile;
+            handle.destroy = destroy;
             handle.regions = {
                 refresh: refreshRegions
             };

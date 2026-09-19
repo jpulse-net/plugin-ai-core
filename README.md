@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.7
+# jPulse Framework / Plugins / AI Core Plugin v1.0.8
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -50,7 +50,7 @@ jPulse.ai.panel.create({ scopeType: 'doc', scopeId: docId });
 
 The namespace is `jPulse.ai`. A site with no client-host tool stays on HTTP. Cancel is `POST /api/1/ai/thread/:id/cancel`. The bundled Hello AI plugin serves `/hello-ai/` (no API key). Drop a file or paste an image on the panel to attach a source or try vision. Copy that pattern; do not import the sample tools. Walkthrough: [Hello AI guide](/jpulse-docs/installed-plugins/hello-ai/README).
 
-The panel accepts site `regions` at named anchors and a complete `commands` list (`jPulse.ai.commands.defaults` is the spread). `/help` command names and examples may be clickable `[[label]]` rows; text after the brackets is a note. `adapter.contextOptions()` shows a context row; `handle.context` keeps it in sync with the page. Sites that implemented `describeScope` on the adapter can delete it — scope labels live on `onAiScopeResolve`. Chips are `handle.attachments()` (`kind: 'source' | 'image'`); `handle.attachmentFile(id)` returns the original file. A deleted object is `AiCore.deleteByScope({ scopeType, scopeId })`.
+The panel accepts site `regions` at named anchors and a complete `commands` list (`jPulse.ai.commands.defaults` is the spread). `/help` command names and examples may be clickable `[[label]]` rows; text after the brackets is a note. `adapter.contextOptions()` shows a context row; `handle.context` keeps it in sync with the page. Sites that implemented `describeScope` on the adapter can delete it — scope labels live on `onAiScopeResolve`. Chips are `handle.attachments()` (`kind: 'source' | 'image'`); `handle.attachmentFile(id)` returns the original file. A deleted object is `AiCore.deleteByScope({ scopeType, scopeId })`. `create({ title })` sets the toolbar label. `storageKey`, `cascade`, and `group` are forwarded to the float panel (`group` is `mobile.exclusive` only). `create()` returns `destroy()`, which unregisters the float panel, closes the per-thread WebSocket, and removes the body node. Compose paste of text stays in the box; only clipboard files and images become chips.
 
 See [docs/README.md](docs/README.md).
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- 1.0.8: `create({ title })` sets the toolbar label. `storageKey`, `cascade`, and `group` are forwarded to the float panel. `create()` returns `destroy()` that removes the body node and closes the per-thread WebSocket. Compose paste of text stays in the box; only clipboard files and images become chips. This turn's source/image list is on the user message; earlier filenames are stale. The (+) attach menu flips to stay inside the panel. Enter on rename does not bubble.
 - 1.0.7: Convert and image uploads honor Site Configuration → AI (`maxConvertBytes` default 25 MB under a 25mb route ceiling). `AiCore.deleteByScope` wipes a deleted object's conversations. Site-wide `defaultToolTimeoutMs` (10000). Reserved `list_sources` / `get_source` refused with a warning. `handle.attachments()` replaces `sources` / `images` / `sourceFile`.
 - 1.0.6: Hello AI extracted as a bundled companion plugin. `bundle.members` is `ai-mock` + `hello-ai`. Disable Hello AI to hide the demo without turning off AI.
 - 1.0.5: Site-owned panel regions and slash commands — named anchors, a complete `commands` list, ten gated defaults, clickable `[[label]]` rows, and a context row gated on `adapter.contextOptions()`. `describeScope` removed from the adapter.

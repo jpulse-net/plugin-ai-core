@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Scope
  * @tagline         AiCore.deleteByScope cascade
  * @file            plugins/ai-core/webapp/tests/unit/scope.test.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

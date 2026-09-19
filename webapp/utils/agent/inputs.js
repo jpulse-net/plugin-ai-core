@@ -3,8 +3,8 @@
  * @tagline         Turn-start user content and follow-up parts
  * @description     Thin loop-facing wrapper over the attachments layer
  * @file            plugins/ai-core/webapp/utils/agent/inputs.js
- * @version         1.0.7
- * @release         2026-09-18
+ * @version         1.0.8
+ * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,7 +13,9 @@
  */
 
 import {
+    appendManifestToUserContent,
     buildUserContent,
+    formatTurnAttachmentManifest,
     mediaFollowUp,
     modelHasVision,
     sourceRefsFrom,
@@ -49,19 +51,28 @@ export function turnExtras(params) {
 export async function openUserContent(params, settings, chosen) {
     const text = params.userText || '';
     const images = Array.isArray(params.images) ? params.images : [];
-    if (!images.length || settings.imagesEnabled === false) {
-        return text;
+    const cleaned = cleanParams(params);
+    const includeImages = images.length > 0
+        && settings.imagesEnabled !== false
+        && modelHasVision(chosen);
+    let content = text;
+    if (includeImages) {
+        const staged = await takeStagedImages(
+            threadOwner(params.actor),
+            String(params.threadId || params.thread?._id || ''),
+            images,
+            params.redisManager
+        );
+        content = buildUserContent(text, staged);
     }
-    if (!modelHasVision(chosen)) {
-        return text;
-    }
-    const staged = await takeStagedImages(
-        threadOwner(params.actor),
-        String(params.threadId || params.thread?._id || ''),
-        images,
-        params.redisManager
-    );
-    return buildUserContent(text, staged);
+    const manifest = formatTurnAttachmentManifest({
+        sources: cleaned.sources,
+        images: cleaned.images,
+        labels: params.scope && params.scope.nouns,
+        sourcesEnabled: settings.sourcesEnabled,
+        includeImages: includeImages
+    });
+    return appendManifestToUserContent(content, manifest);
 }
 
 export function followFromResult(result) {
