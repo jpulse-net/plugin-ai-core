@@ -3,7 +3,7 @@
  * @tagline         Effective AI settings
  * @description     Site config tab, optional app.conf.ai, and plugin debug flag
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

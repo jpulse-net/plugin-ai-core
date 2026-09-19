@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -20,6 +20,8 @@ if (!window.jPulse) {
     const I18N = {
         title: '{{i18n.view.ui.ai.panel.title}}',
         newConversation: '{{i18n.view.ui.ai.panel.newConversation}}',
+        newConfirmTitle: '{{i18n.view.ui.ai.panel.newConfirmTitle}}',
+        newConfirmBody: '{{i18n.view.ui.ai.panel.newConfirmBody}}',
         rename: '{{i18n.view.ui.ai.panel.rename}}',
         send: '{{i18n.view.ui.ai.panel.send}}',
         cancel: '{{i18n.view.ui.ai.panel.cancel}}',
@@ -93,6 +95,8 @@ if (!window.jPulse) {
         stripAttach: '{{i18n.view.ui.ai.attach.stripAttach}}',
         stripAdd: '{{i18n.view.ui.ai.attach.stripAdd}}',
         stripUrl: '{{i18n.view.ui.ai.attach.stripUrl}}',
+        chipAttach: '{{i18n.view.ui.ai.attach.chipAttach}}',
+        chipAttachBlocked: '{{i18n.view.ui.ai.attach.chipAttachBlocked}}',
         chipRemove: '{{i18n.view.ui.ai.attach.chipRemove}}',
         chipDetailName: '{{i18n.view.ui.ai.attach.chipDetailName}}',
         chipDetailUrl: '{{i18n.view.ui.ai.attach.chipDetailUrl}}',
@@ -570,37 +574,6 @@ if (!window.jPulse) {
             return message;
         }
 
-        function waitForWs(conn) {
-            if (conn.isConnected && conn.isConnected()) {
-                return Promise.resolve();
-            }
-            return new Promise((resolve, reject) => {
-                let settled = false;
-                const timer = setTimeout(() => {
-                    if (!settled) {
-                        settled = true;
-                        reject(new Error(I18N.reconnecting));
-                    }
-                }, 15000);
-                conn.onStatusChange((status) => {
-                    if (settled) {
-                        return;
-                    }
-                    if (status === 'connected') {
-                        settled = true;
-                        clearTimeout(timer);
-                        resolve();
-                        return;
-                    }
-                    if (status === 'auth-required') {
-                        settled = true;
-                        clearTimeout(timer);
-                        reject(new Error(I18N.error));
-                    }
-                });
-            });
-        }
-
         async function handleToolCall(message, reply) {
             const data = (message && message.data) || {};
             let result;
@@ -670,7 +643,6 @@ if (!window.jPulse) {
         async function connectWs(threadId) {
             const path = `/api/1/ws/ai/${threadId}`;
             if (wsConn && wsConn.path === path) {
-                await waitForWs(wsConn);
                 return wsConn;
             }
             disconnectWs();
@@ -707,8 +679,9 @@ if (!window.jPulse) {
                     }
                 });
             }
-            await waitForWs(conn);
-            emitAll(listeners, { type: 'connected' });
+            if (conn.isConnected && conn.isConnected()) {
+                emitAll(listeners, { type: 'connected' });
+            }
             return conn;
         }
 
@@ -754,9 +727,7 @@ if (!window.jPulse) {
             }
             if (capability.transport === 'ws') {
                 await connectWs(threadId);
-                if (!wsConn.send({ type: 'turn', data: body })) {
-                    emitAll(listeners, { type: 'error', message: I18N.error });
-                }
+                wsConn.send({ type: 'turn', data: body });
                 return;
             }
             await startHttpTurn(threadId, body);
@@ -858,13 +829,19 @@ if (!window.jPulse) {
         const handle = jPulse.UI.floatPanel.create({
             id: panelId,
             el: root,
-            defaults: { w: 420, h: 560, open: !!options.open },
-            minWidth: 320,
-            minHeight: 360,
+            defaults: {
+                w: 420,
+                h: 560,
+                open: !!options.open,
+                ...(options.defaults || {})
+            },
+            minWidth: options.minWidth != null ? options.minWidth : 320,
+            minHeight: options.minHeight != null ? options.minHeight : 360,
             launcher: options.launcher,
             storageKey: options.storageKey,
             cascade: options.cascade,
             group: options.group,
+            mobile: options.mobile,
             onOpen: function () {
                 pinMessages();
             }
@@ -1319,6 +1296,44 @@ if (!window.jPulse) {
             return '📄';
         }
 
+        function hasAttach() {
+            return typeof adapter.attach === 'function';
+        }
+
+        function attachmentRow(id) {
+            const src = state.sources.find((row) => row.id === id);
+            if (src) {
+                return sourceMeta(src);
+            }
+            const img = state.images.find((row) => row.id === id);
+            return img ? imageMeta(img) : null;
+        }
+
+        function attachGate(row) {
+            if (typeof adapter.canAttach !== 'function') {
+                return { ok: true };
+            }
+            const out = adapter.canAttach(row);
+            if (out && out.ok === false) {
+                return {
+                    ok: false,
+                    reason: out.reason || I18N.chipAttachBlocked
+                };
+            }
+            return { ok: true };
+        }
+
+        function chipAttachChrome(id, kind) {
+            if (!hasAttach()) {
+                return '';
+            }
+            return `<span class="plg-ai-chip-more-wrap">`
+                + `<button type="button" class="plg-ai-chip-more" data-chip-more="${escapeHtml(id)}" data-chip-kind="${kind}" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(I18N.chipAttach)}">⋯</button>`
+                + `<div class="plg-ai-chip-menu" hidden role="menu">`
+                + `<button type="button" class="plg-ai-chip-attach" data-chip-attach="${escapeHtml(id)}" data-chip-kind="${kind}" role="menuitem">${escapeHtml(I18N.chipAttach)}</button>`
+                + `</div></span>`;
+        }
+
         function renderStrip() {
             const cap = state.capability || {};
             const show = cap.sourcesEnabled !== false || (cap.imagesEnabled !== false && cap.imagesAvailable !== false);
@@ -1342,21 +1357,27 @@ if (!window.jPulse) {
                 const tip = chipTip([src.name, url || src.origin, src.chars]);
                 const kind = src.origin === 'url' ? 'url' : 'file';
                 chips.push(
-                    `<button type="button" class="plg-ai-chip jp-tooltip" data-src="${escapeHtml(src.id)}" data-tooltip="${escapeHtml(tip)}">`
+                    `<div class="plg-ai-chip jp-tooltip" data-tooltip="${escapeHtml(tip)}">`
+                    + `<button type="button" class="plg-ai-chip-body" data-src="${escapeHtml(src.id)}">`
                     + `<span class="plg-ai-chip-icon" aria-hidden="true">${chipIcon(kind)}</span>`
                     + `<span class="plg-ai-chip-name">${escapeHtml(src.name)}</span>`
-                    + `<span class="plg-ai-chip-remove" data-remove="${escapeHtml(src.id)}" title="${escapeHtml(I18N.chipRemove)}">×</span>`
                     + '</button>'
+                    + chipAttachChrome(src.id, 'src')
+                    + `<button type="button" class="plg-ai-chip-remove" data-remove="${escapeHtml(src.id)}" title="${escapeHtml(I18N.chipRemove)}" aria-label="${escapeHtml(I18N.chipRemove)}">×</button>`
+                    + '</div>'
                 );
             });
             state.images.forEach((img) => {
                 const tip = chipTip([img.name, `${img.width || 0}×${img.height || 0}`]);
                 chips.push(
-                    `<button type="button" class="plg-ai-chip plg-ai-chip--image jp-tooltip" data-img="${escapeHtml(img.id)}" data-tooltip="${escapeHtml(tip)}">`
+                    `<div class="plg-ai-chip plg-ai-chip--image jp-tooltip" data-tooltip="${escapeHtml(tip)}">`
+                    + `<button type="button" class="plg-ai-chip-body" data-img="${escapeHtml(img.id)}">`
                     + `<span class="plg-ai-chip-icon" aria-hidden="true">${chipIcon('image')}</span>`
                     + `<span class="plg-ai-chip-name">${escapeHtml(img.name)}</span>`
-                    + `<span class="plg-ai-chip-remove" data-remove-img="${escapeHtml(img.id)}" title="${escapeHtml(I18N.chipRemove)}">×</span>`
                     + '</button>'
+                    + chipAttachChrome(img.id, 'img')
+                    + `<button type="button" class="plg-ai-chip-remove" data-remove-img="${escapeHtml(img.id)}" title="${escapeHtml(I18N.chipRemove)}" aria-label="${escapeHtml(I18N.chipRemove)}">×</button>`
+                    + '</div>'
                 );
             });
             els.chips.innerHTML = chips.join('');
@@ -1663,6 +1684,33 @@ if (!window.jPulse) {
                     /* mailbox TTL is the fallback */
                 }
             }
+        }
+
+        function attachmentCount() {
+            return state.sources.length + state.images.length;
+        }
+
+        async function confirmDropAttachments() {
+            if (attachmentCount() === 0) {
+                return true;
+            }
+            if (jPulse.UI && typeof jPulse.UI.confirmDialog === 'function') {
+                const result = await jPulse.UI.confirmDialog({
+                    title: I18N.newConfirmTitle,
+                    message: I18N.newConfirmBody,
+                    buttons: [I18N.cancel, I18N.newConversation]
+                });
+                return !!(result && result.confirmed);
+            }
+            return window.confirm(I18N.newConfirmBody);
+        }
+
+        async function confirmDropAttachmentsForSwitch(threadId) {
+            const sameThread = String(threadId || '') === state.threadId;
+            if (sameThread || attachmentCount() === 0) {
+                return true;
+            }
+            return confirmDropAttachments();
         }
 
         function sourceRefsBadge(turn) {
@@ -2208,6 +2256,9 @@ if (!window.jPulse) {
                     return I18N.slashConversationsBad;
                 }
                 const thread = threads[index - 1];
+                if (!(await confirmDropAttachmentsForSwitch(thread._id))) {
+                    return false;
+                }
                 await openThread(thread._id);
                 return fillToken(I18N.slashConversationsOpened, '%LABEL%', threadOptionLabel(thread));
             }
@@ -2297,6 +2348,9 @@ if (!window.jPulse) {
             tools: toolsText,
             model: runModel,
             new: async function () {
+                if (!(await confirmDropAttachments())) {
+                    return false;
+                }
                 await createNew();
                 return I18N.newConversation;
             },
@@ -2326,6 +2380,9 @@ if (!window.jPulse) {
 
         async function runSlash(cmd) {
             const reply = await applySlash(cmd);
+            if (reply === false) {
+                return;
+            }
             if (reply === null) {
                 await appendLocal(slashDisplay(cmd), '');
                 return;
@@ -2674,6 +2731,96 @@ if (!window.jPulse) {
             }
         }
 
+        function hideChipMenus(except) {
+            if (!els.chips) {
+                return;
+            }
+            els.chips.querySelectorAll('.plg-ai-chip-menu').forEach((menu) => {
+                if (except && menu === except) {
+                    return;
+                }
+                menu.hidden = true;
+                menu.style.left = '';
+                menu.style.right = '';
+                const more = menu.parentNode && menu.parentNode.querySelector('.plg-ai-chip-more');
+                if (more) {
+                    more.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        function positionChipMenu(menu, more) {
+            if (!menu || !more) {
+                return;
+            }
+            const clip = (root.closest && root.closest('.jp-float-panel')) || root;
+            const clipRect = clip.getBoundingClientRect();
+            const moreRect = more.getBoundingClientRect();
+            const onRight = moreRect.left + moreRect.width / 2 >= clipRect.left + clipRect.width / 2;
+            if (onRight) {
+                menu.style.left = 'auto';
+                menu.style.right = '0px';
+            } else {
+                menu.style.left = '0px';
+                menu.style.right = 'auto';
+            }
+        }
+
+        function toggleChipMenu(more) {
+            const wrap = more && more.closest('.plg-ai-chip-more-wrap');
+            const menu = wrap && wrap.querySelector('.plg-ai-chip-menu');
+            if (!menu) {
+                return;
+            }
+            const open = menu.hidden;
+            hideChipMenus(menu);
+            hideAddMenu();
+            menu.hidden = !open;
+            more.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) {
+                const id = more.getAttribute('data-chip-more');
+                const row = attachmentRow(id);
+                const gate = attachGate(row);
+                const item = menu.querySelector('[data-chip-attach]');
+                if (item) {
+                    item.disabled = !gate.ok;
+                    if (gate.ok) {
+                        item.removeAttribute('title');
+                    } else {
+                        item.title = gate.reason || I18N.chipAttachBlocked;
+                    }
+                }
+                positionChipMenu(menu, more);
+                if (jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.closeActive === 'function') {
+                    jPulse.UI.tooltip.closeActive();
+                }
+            } else {
+                menu.style.left = '';
+                menu.style.right = '';
+            }
+        }
+
+        async function runChipAttach(id) {
+            hideChipMenus();
+            const row = attachmentRow(id);
+            if (!row || typeof adapter.attach !== 'function') {
+                return;
+            }
+            const gate = attachGate(row);
+            if (!gate.ok) {
+                showToast(gate.reason || I18N.chipAttachBlocked, 'error');
+                return;
+            }
+            try {
+                const ok = await adapter.attach(row, handle.attachmentFile(row.id));
+                if (!ok) {
+                    showToast(I18N.error, 'error');
+                }
+            } catch (error) {
+                showToast(error.message || I18N.error, 'error');
+            }
+        }
+
         function positionAddMenu() {
             if (!els.addMenu || !els.add) {
                 return;
@@ -2696,6 +2843,7 @@ if (!window.jPulse) {
                 return;
             }
             const open = els.addMenu.hidden;
+            hideChipMenus();
             els.addMenu.hidden = !open;
             if (els.add) {
                 els.add.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -2794,6 +2942,9 @@ if (!window.jPulse) {
                 && !(target.closest && target.closest('.plg-ai-strip-add'))) {
                 hideAddMenu();
             }
+            if (!(target.closest && target.closest('.plg-ai-chip-more-wrap'))) {
+                hideChipMenus();
+            }
             if (els.chipPop && !els.chipPop.hidden
                 && !(target.closest && (target.closest('.plg-ai-chip-pop') || target.closest('.plg-ai-chip')))) {
                 hideChipPop();
@@ -2802,6 +2953,7 @@ if (!window.jPulse) {
         function onDocumentKeydown(event) {
             if (event.key === 'Escape') {
                 hideAddMenu();
+                hideChipMenus();
                 hideChipPop();
             }
         }
@@ -2809,6 +2961,21 @@ if (!window.jPulse) {
         document.addEventListener('keydown', onDocumentKeydown);
         if (els.chips) {
             els.chips.addEventListener('click', (event) => {
+                const moreBtn = event.target.closest('[data-chip-more]');
+                if (moreBtn) {
+                    event.stopPropagation();
+                    toggleChipMenu(moreBtn);
+                    return;
+                }
+                const attachBtn = event.target.closest('[data-chip-attach]');
+                if (attachBtn) {
+                    event.stopPropagation();
+                    if (attachBtn.disabled) {
+                        return;
+                    }
+                    runChipAttach(attachBtn.getAttribute('data-chip-attach'));
+                    return;
+                }
                 const removeSrc = event.target.closest('[data-remove]');
                 const removeImg = event.target.closest('[data-remove-img]');
                 if (removeSrc) {
@@ -3010,13 +3177,23 @@ if (!window.jPulse) {
             });
         }
         els.cancel.addEventListener('click', cancelTurn);
-        els.newer.addEventListener('click', createNew);
+        els.newer.addEventListener('click', async () => {
+            if (!(await confirmDropAttachments())) {
+                return;
+            }
+            await createNew();
+        });
         els.rename.addEventListener('click', startRename);
         els.threadSelect.addEventListener('change', async () => {
             const id = els.threadSelect.value;
-            if (id) {
-                await openThread(id);
+            if (!id) {
+                return;
             }
+            if (!(await confirmDropAttachmentsForSwitch(id))) {
+                els.threadSelect.value = state.threadId;
+                return;
+            }
+            await openThread(id);
         });
         els.threadEdit.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
@@ -3068,6 +3245,9 @@ if (!window.jPulse) {
                 return;
             }
             destroyed = true;
+            if (state.running && state.threadId) {
+                jPulse.api.post(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/cancel`).catch(function () {});
+            }
             if (transport && typeof transport.disconnect === 'function') {
                 transport.disconnect();
             }
@@ -3083,6 +3263,18 @@ if (!window.jPulse) {
                 root.parentNode.removeChild(root);
             }
         }
+        function setTitle(value) {
+            const next = (typeof value === 'string' && value.trim())
+                ? value.trim()
+                : I18N.title;
+            const titleEl = root.querySelector('.plg-ai-title');
+            if (titleEl) {
+                titleEl.textContent = next;
+            }
+            if (els.threadSelect) {
+                els.threadSelect.setAttribute('aria-label', next);
+            }
+        }
         const panelApi = {
             handle: handle,
             root: root,
@@ -3096,12 +3288,14 @@ if (!window.jPulse) {
             attachmentFile: function (id) {
                 return panelStore.files.get(id) || null;
             },
-            destroy: destroy
+            destroy: destroy,
+            setTitle: setTitle
         };
         if (handle) {
             handle.attachments = panelApi.attachments;
             handle.attachmentFile = panelApi.attachmentFile;
             handle.destroy = destroy;
+            handle.setTitle = setTitle;
             handle.regions = {
                 refresh: refreshRegions
             };

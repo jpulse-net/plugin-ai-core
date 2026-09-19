@@ -3,7 +3,7 @@
  * @tagline         Named quota dimensions and the shipped period policy
  * @description     Subject is resolved, not assumed; turn-start only, permissive (TD-02)
  * @file            plugins/ai-core/webapp/utils/agent/quota.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Panel Strip
  * @tagline         Chip lifetime, mailbox delete routes, and send-time strip contracts
  * @file            plugins/ai-core/webapp/tests/unit/panel-strip.test.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -140,16 +140,22 @@ describe('prior strip regressions stay closed', () => {
 
     test('destroy closes the socket and removes the node', () => {
         const body = fnBody('destroy');
+        expect(body).toMatch(/\/cancel/);
         expect(body).toMatch(/transport\.disconnect\(\)/);
         expect(body).toMatch(/removeChild\(root\)/);
+        expect(body.indexOf('/cancel')).toBeLessThan(body.indexOf('transport.disconnect()'));
     });
 
-    test('create forwards title and the three shell keys', () => {
+    test('create forwards title and the seven shell keys', () => {
         expect(panel).toMatch(/typeof options\.title === 'string'/);
         expect(panel).toMatch(/storageKey: options\.storageKey/);
         expect(panel).toMatch(/cascade: options\.cascade/);
         expect(panel).toMatch(/group: options\.group/);
-        expect(panel).not.toMatch(/\.\.\.options/);
+        expect(panel).toMatch(/mobile: options\.mobile/);
+        expect(panel).toMatch(/\.\.\.\(options\.defaults \|\| \{\}\)/);
+        expect(panel).toMatch(/minWidth: options\.minWidth != null \? options\.minWidth : 320/);
+        expect(panel).toMatch(/minHeight: options\.minHeight != null \? options\.minHeight : 360/);
+        expect(panel).not.toMatch(/\.\.\.options(?!\.defaults)/);
     });
 
     test('source ✕ does not delete the image mailbox', () => {

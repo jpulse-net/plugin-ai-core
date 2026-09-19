@@ -3,7 +3,7 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -117,7 +117,7 @@
 
 .plg-ai-compose {
     position: relative;
-    padding: 8px 10px 6px;
+    padding: 8px 10px calc(6px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--jp-theme-border-color);
     flex-shrink: 0;
     transition: box-shadow 0.12s ease, background-color 0.12s ease;
@@ -293,6 +293,18 @@
     background: var(--jp-theme-bg-secondary);
     color: var(--jp-theme-text-primary);
     font-size: 0.8em;
+}
+
+.plg-ai-chip-body {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
     cursor: pointer;
 }
 
@@ -308,8 +320,62 @@
     max-width: 14em;
 }
 
+.plg-ai-chip-more-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.plg-ai-chip-more,
 .plg-ai-chip-remove {
+    padding: 0;
+    border: none;
+    background: transparent;
     color: var(--jp-theme-text-secondary);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.plg-ai-chip-menu {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 4px);
+    z-index: 6;
+    min-width: 8em;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--jp-theme-border-color);
+    border-radius: 6px;
+    background: var(--jp-theme-bg-primary);
+    box-shadow: var(--jp-theme-shadow-md);
+}
+
+.plg-ai-chip-menu[hidden] {
+    display: none;
+}
+
+.plg-ai-chip-attach {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--jp-theme-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.plg-ai-chip-attach:hover {
+    background: var(--jp-theme-bg-tertiary);
+}
+
+.plg-ai-chip-attach:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .plg-ai-chip-pop {

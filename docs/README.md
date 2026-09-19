@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.9
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.10
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -114,6 +114,9 @@ jPulse.ai.panel.create({
     title:     'AI Agent',
     storageKey: 'aiAgent:window',
     cascade:   true,
+    group:     'map',
+    mobile:    { exclusive: true, breakpoint: 768 },
+    defaults:  { w: 360, h: 480 },
     adapter: {
         toolData(name) { … },
         describeContext() { … },
@@ -122,14 +125,18 @@ jPulse.ai.panel.create({
         executeTool(name, args) { … },
         renderProposalPreview(proposal) { … },
         applyProposal(proposal) { … },
-        undoProposal(proposal) { … }
+        undoProposal(proposal) { … },
+        canAttach(row) { … },
+        attach(row, file) { … }
     }
 });
 ```
 
 `adapter` may be omitted. `toolData` plus `describeContext` / `describeTarget` are enough for a read-only agent. Scope labels belong on `onAiScopeResolve`, not the adapter. `executeTool` is the exception, not the interface. The three `*Proposal` methods are used only when a registered tool declares `proposes: true`. `contextOptions()` is optional: implement it and the panel shows a context row and `/context`; omit it and neither appears.
 
-`title` is the toolbar label. A non-empty string replaces the i18n default ("AI chat"). Create-time only. `storageKey`, `cascade`, and `group` are forwarded to `jPulse.UI.floatPanel.create()`; omit them and the shell defaults apply (`jp:floatPanel:<id>`, no cascade, group `default`). Cascade occupancy is every registered panel's `x` / `y`, not open-only and not same-group — a closed chat created on page load still occupies the default corner. `group` is only `mobile.exclusive`; forwarding it does nothing until exclusive is on. Any parseable JSON at `storageKey` skips cascade; a leftover blob without `x` / `y` / `w` / `h` / `open` still counts. Clear it once or rewrite it in that shape. The rest of the create bag is not spread into the shell. `create()` returns `destroy()`: it unregisters the float panel, closes the per-thread WebSocket (a no-op when the probe stayed on HTTP), and removes the body node (`create()` always appends one). A site only calls `destroy()`; it does not close `/api/1/ws/ai/:threadId` itself. A second call is a no-op. Compose paste of text stays in the textarea. Only clipboard files and images become chips. Attach a text source with drop or the (+) menu. The (+) attach menu opens to the right when the (+) is in the left half of the panel, and to the left when it is in the right half.
+`adapter.attach(row, file)` is optional. Implement it and each chip gets a ⋯ menu with **Attach** (i18n `chipAttach`; a map site overrides that string). Omit it and there is no ⋯ — Hello AI stays clean. `canAttach(row)` omitted treats every chip as attachable. `{ ok: false, reason }` keeps the item visible and disabled, with `reason` on the menu. Click calls `attach(row, handle.attachmentFile(row.id))`. The site writes (the same path as a canvas drop). It is not a proposal, does not consult `toolsWrite`, does not open an Apply card, and does not remove the chip. Chip click still opens the details pop; ⋯ is a separate control.
+
+`title` is the toolbar label. A non-empty string replaces the i18n default ("AI chat"). `handle.setTitle(str)` restamps `.plg-ai-title` and the thread-select `aria-label`; `''` or `null` restores the i18n default. `storageKey`, `cascade`, `group`, `mobile`, `defaults`, `minWidth`, and `minHeight` are forwarded to `jPulse.UI.floatPanel.create()` by those names. Omit them and the plugin defaults apply (`defaults: { w: 420, h: 560, open }`, `minWidth: 320`, `minHeight: 360`, floatPanel's own mobile bag with `exclusive: false`). Passed `defaults` merge on top of 420×560/`open`, so `{ w: 360, h: 480 }` does not lose `open`. Cascade occupancy is every registered panel's `x` / `y`, not open-only and not same-group — a closed chat created on page load still occupies the default corner. `group` is only `mobile.exclusive`; `mobile: { exclusive: true, breakpoint: 768 }` is what makes `group: 'map'` mean anything. Any parseable JSON at `storageKey` skips cascade; a leftover blob without `x` / `y` / `w` / `h` / `open` still counts. Clear it once or rewrite it in that shape. The rest of the create bag is not spread into the shell. `create()` returns `destroy()`: if a turn is running it fires `POST /api/1/ai/thread/:id/cancel` (it does not wait), then unregisters the float panel, closes the per-thread WebSocket (a no-op when the probe stayed on HTTP), and removes the body node (`create()` always appends one). A site only calls `destroy()`; it does not close `/api/1/ws/ai/:threadId` itself. A second call is a no-op. It does not clear `localStorage`. `/new`, the (+) new button, and a conversation switch that would drop chips share one confirm when the strip is not empty. Compose paste of text stays in the textarea. Only clipboard files and images become chips. Attach a text source with drop or the (+) menu. The (+) attach menu and the chip ⋯ menu open to the right when the control is in the left half of the panel, and to the left when it is in the right half. Send queues until the socket is open (jPulse `>=2.0.5`).
 
 `get_source` and `list_sources` are owned by the panel. The client bridge asks a panel-internal provider before `adapter.toolData`, so a site with no adapter still gets working sources. Those two names are reserved: a site registration is refused, the panel's tools stay, and `/tools` shows the collision as withheld (`reserved`). It does not throw.
 
@@ -233,3 +240,17 @@ What a site adds through `onAiPromptFragment` is domain steering — where to pu
 ## Admin
 
 Site Configuration → AI holds the master switch, roles, models, quota, loop limits (including the default tool timeout), tool policy, retention, auto-title, site instructions, the false-claim phrase list, and the source / URL / convert / image caps. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.
+
+## Plugin releases
+
+- **1.0.10**, W-237, 2026-09-19: Chip ⋯ Attach when `adapter.attach` exists. `create()` forwards `mobile`, `defaults`, `minWidth`, and `minHeight`. Compose pads `safe-area-inset-bottom`. `destroy()` cancels a running turn. `/new` and a chip-dropping thread switch confirm. `handle.setTitle`. WebSocket turns carry `session.user`. Send queues until the socket is open; requires jPulse `>=2.0.5`.
+- **1.0.9**, W-234, 2026-09-19: Image chips stay on Send, same as text and URL chips. The Redis mailbox peeks and is deleted only on ✕, `/new`, thread switch, or reload.
+- **1.0.8**, W-233, 2026-09-19: `create({ title })` sets the toolbar label. `storageKey`, `cascade`, and `group` are forwarded to the float panel. `create()` returns `destroy()` that removes the body node and closes the per-thread WebSocket. Compose paste of text stays in the box; only clipboard files and images become chips. This turn's source/image list is on the user message; earlier filenames are stale. The (+) attach menu flips to stay inside the panel. Enter on rename does not bubble.
+- **1.0.7**, W-232, 2026-09-18: Convert and image uploads honor Site Configuration → AI (`maxConvertBytes` default 25 MB under a 25mb route ceiling). `AiCore.deleteByScope` wipes a deleted object's conversations. Site-wide `defaultToolTimeoutMs` (10000). Reserved `list_sources` / `get_source` refused with a warning. `handle.attachments()` replaces `sources` / `images` / `sourceFile`.
+- **1.0.6**, W-231, 2026-09-17: Hello AI extracted as a bundled companion plugin. `bundle.members` is `ai-mock` + `hello-ai`. Disable Hello AI to hide the demo without turning off AI.
+- **1.0.5**, W-230, 2026-09-17: Site-owned panel regions and slash commands — named anchors, a complete `commands` list, ten gated defaults, clickable `[[label]]` rows, and a context row gated on `adapter.contextOptions()`. `describeScope` removed from the adapter.
+- **1.0.4**, W-228, 2026-09-17: Attachments, URL ingest, document conversion path, and vision — tab-local sources, Redis-staged images, `list_sources` / `get_source`, streaming convert and image-stage routes. No converter ships.
+- **1.0.3**, W-227, 2026-09-17: Propose and apply — proposal records on the turn, Apply cards, apply/undo endpoints, and a site-configured false-claim guard. `hello-ai` adds `propose_draft_rewrite` beside the direct write.
+- **1.0.2**, W-226, 2026-09-17: Chat panel (`jPulse.ai.panel`), client-host tools over a per-thread WebSocket, shared `utils/ai-tools/` modules, and the `/hello-ai/` scratch-pad demo. Requires framework >= 2.0.3.
+- **1.0.1**, W-224, 2026-09-17: Model-selection surface — omit a provider with `configured: false`, persist the thread pair, accept `provider`/`model` on `PUT /api/1/ai/thread/:id`, grey non-vision rows when `?hasImages=1`, provider-only site default, and the live capability probe on `/jpulse-plugins/ai-core.shtml`.
+- **1.0.0**, W-223, 2026-09-17: First release: tools layer, agent layer, mock-ready provider contract, HTTP/SSE, admin AI tab, usage page.

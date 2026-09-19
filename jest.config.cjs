@@ -3,7 +3,7 @@
  * @tagline         Delegate Jest to the parent jPulse framework checkout
  * @description     Unit tests need that repo's Babel transform, globalSetup, and .jpulse/app.json
  * @file            plugins/ai-core/jest.config.cjs
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / WS Bridge
  * @tagline         Namespace authorization and client-host mapping
  * @file            plugins/ai-core/webapp/tests/unit/ws-bridge.test.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,6 +12,8 @@
  */
 
 import { afterEach, describe, expect, test } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
 import { chooseTransport } from '../../utils/transport/index.js';
 import { authorizeAiSocket, executeClientTool, mapClientReply } from '../../utils/transport/ws.js';
 import {
@@ -66,6 +68,32 @@ describe('AI WebSocket authorization', () => {
         expect(ctx.username).toBe('jdoe');
         expect(ctx.threadId).toBe('t1');
         expect(ctx.createdBy).toBe('jdoe');
+        expect(ctx.user).toEqual({ username: 'jdoe', roles: ['user'] });
+    });
+
+    test('handshake user is stashed on ctx for the turn actor', async () => {
+        const user = { username: 'jdoe', roles: ['user'], email: 'jdoe@example.com' };
+        const ctx = await authorizeAiSocket(
+            { user: user, session: { user: user } },
+            { params: { threadId: 't1' } },
+            {
+                loadSettings: async () => settings(),
+                threadModel: threadModel({
+                    _id: 't1',
+                    createdBy: 'jdoe',
+                    scopeType: 'doc',
+                    scopeId: 'd1'
+                })
+            }
+        );
+        expect(ctx.user).toBe(user);
+        const src = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/transport/ws.js'),
+            'utf8'
+        );
+        expect(src).toMatch(/session:\s*\{\s*user:\s*handshakeUser\s*\}/);
+        expect(src).toMatch(/user:\s*handshakeUser/);
+        expect(src).toMatch(/conn\.ctx\.user \|\| \{/);
     });
 
     test('non-owner is refused before the upgrade', async () => {

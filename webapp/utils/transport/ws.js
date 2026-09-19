@@ -3,7 +3,7 @@
  * @tagline         Per-thread AI namespace and client-host bridge
  * @description     Authorize the handshake, start turns on the socket, call the origin tab
  * @file            plugins/ai-core/webapp/utils/transport/ws.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -65,6 +65,7 @@ export async function authorizeAiSocket(req, ctx, deps = {}) {
     if (thread.createdBy !== threadOwner(actor)) {
         return null;
     }
+    const handshakeUser = req?.user || req?.session?.user || null;
     return {
         ...ctx,
         threadId: String(thread._id),
@@ -72,7 +73,8 @@ export async function authorizeAiSocket(req, ctx, deps = {}) {
         createdBy: thread.createdBy,
         scopeType: thread.scopeType,
         scopeId: thread.scopeId,
-        roles: actor.roles
+        roles: actor.roles,
+        user: handshakeUser
     };
 }
 
@@ -178,8 +180,13 @@ export function registerAiNamespace(deps = {}) {
         if (!threadId) {
             return;
         }
+        const handshakeUser = conn.ctx.user || {
+            username: conn.ctx.username,
+            roles: conn.ctx.roles || []
+        };
         const actor = actorFromRequest({
-            user: { username: conn.ctx.username, roles: conn.ctx.roles || [] }
+            user: handshakeUser,
+            session: { user: handshakeUser }
         }, {
             origin: 'ws',
             scopeType: conn.ctx.scopeType,

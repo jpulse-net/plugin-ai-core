@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.9
+ * @version         1.0.10
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -120,20 +120,22 @@ describe('1.0.8 extras.prompt is unused', () => {
 });
 
 describe('1.0.8 create() chrome', () => {
-    test('title is create-time only; no live setter', () => {
+    test('title is create-time and handle.setTitle can restamp it', () => {
         expect(panel).toMatch(/typeof options\.title === 'string' && options\.title\.trim\(\)/);
-        expect(panel).not.toMatch(/setTitle/);
-        expect(panel).not.toMatch(/handle\.setTitle/);
+        expect(panel).toMatch(/function setTitle\(value\)/);
+        expect(panel).toMatch(/handle\.setTitle = setTitle/);
         expect(panel).not.toMatch(/I18N\.title\s*=/);
     });
 
-    test('shell bag is the three named keys, not a spread', () => {
+    test('shell bag is the named keys, not a spread', () => {
         expect(panel).toMatch(/storageKey: options\.storageKey/);
         expect(panel).toMatch(/cascade: options\.cascade/);
         expect(panel).toMatch(/group: options\.group/);
-        expect(panel).not.toMatch(/floatPanel\.create\(\{[\s\S]*?\.\.\.options/);
-        expect(panel).not.toMatch(/mobile: options\.mobile/);
-        expect(panel).not.toMatch(/defaults: options\.defaults/);
+        expect(panel).toMatch(/mobile: options\.mobile/);
+        expect(panel).toMatch(/\.\.\.\(options\.defaults \|\| \{\}\)/);
+        expect(panel).toMatch(/minWidth: options\.minWidth != null \? options\.minWidth : 320/);
+        expect(panel).toMatch(/minHeight: options\.minHeight != null \? options\.minHeight : 360/);
+        expect(panel).not.toMatch(/floatPanel\.create\(\{[\s\S]*?\.\.\.options(?!\.defaults)/);
     });
 
     test('rename Enter and Escape both stop before the input hides', () => {
@@ -147,7 +149,7 @@ describe('1.0.8 create() chrome', () => {
 
     test('destroy disconnects the socket before removing the node', () => {
         const start = panel.indexOf('function destroy()');
-        const body = panel.slice(start, start + 800);
+        const body = panel.slice(start, start + 1200);
         expect(body.indexOf('transport.disconnect()')).toBeGreaterThan(-1);
         expect(body.indexOf('removeChild(root)')).toBeGreaterThan(-1);
         expect(body.indexOf('transport.disconnect()')).toBeLessThan(body.indexOf('removeChild(root)'));
@@ -373,6 +375,87 @@ describe('1.0.9 chip and mailbox lifetime', () => {
         );
         expect(helloCtrl).not.toMatch(/propose_image/);
         expect(helloCtrl).toMatch(/name: 'propose_draft_rewrite'/);
+    });
+});
+
+describe('1.0.10 chip attach, shell, destroy cancel', () => {
+    test('⋯ ships only when adapter.attach is a function', () => {
+        expect(panel).toMatch(/typeof adapter\.attach === 'function'/);
+        expect(panel).toMatch(/function chipAttachChrome/);
+        expect(panel).toMatch(/data-chip-more/);
+        expect(panel).toMatch(/adapter\.attach\(row, handle\.attachmentFile\(row\.id\)\)/);
+        expect(panel).toMatch(/adapter\.canAttach/);
+        expect(panel).not.toMatch(/sourceAttachable/);
+    });
+
+    test('destroy fires cancel before disconnect', () => {
+        const start = panel.indexOf('function destroy()');
+        const body = panel.slice(start, start + 900);
+        expect(body).toMatch(/state\.running && state\.threadId/);
+        expect(body).toMatch(/\/api\/1\/ai\/thread\/\$\{encodeURIComponent\(state\.threadId\)\}\/cancel/);
+        expect(body.indexOf('/cancel')).toBeGreaterThan(-1);
+        expect(body.indexOf('/cancel')).toBeLessThan(body.indexOf('transport.disconnect()'));
+    });
+
+    test('/new and a chip-dropping switch share one confirm', () => {
+        expect(panel).toMatch(/function confirmDropAttachments/);
+        expect(panel).toMatch(/function confirmDropAttachmentsForSwitch/);
+        expect(panel).toMatch(/state\.sources\.length \+ state\.images\.length/);
+        expect(panel).toMatch(/I18N\.newConfirmTitle/);
+        expect(panel).toMatch(/I18N\.newConfirmBody/);
+        expect(panel).toMatch(/confirmDropAttachmentsForSwitch\(thread\._id\)/);
+        expect(panel).toMatch(/confirmDropAttachmentsForSwitch\(id\)/);
+    });
+
+    test('startTurn does not wait for the socket and does not treat a false send as an error', () => {
+        const start = panel.indexOf('async function startTurn(');
+        expect(start).toBeGreaterThan(-1);
+        const open = panel.indexOf('{', start);
+        let depth = 0;
+        let end = open;
+        for (let i = open; i < panel.length; i += 1) {
+            if (panel[i] === '{') {
+                depth += 1;
+            } else if (panel[i] === '}') {
+                depth -= 1;
+                if (depth === 0) {
+                    end = i;
+                    break;
+                }
+            }
+        }
+        const body = panel.slice(open, end + 1);
+        expect(body).not.toMatch(/waitForWs/);
+        expect(body).toMatch(/wsConn\.send\(\{ type: 'turn', data: body \}\)/);
+        expect(body).not.toMatch(/if \(!wsConn\.send/);
+        expect(body).not.toMatch(/type: 'error'/);
+        expect(panel).not.toMatch(/function waitForWs/);
+    });
+
+    test('compose pads the home indicator and the chip menu stays inside', () => {
+        expect(css).toMatch(/safe-area-inset-bottom/);
+        const chipMenu = css.match(/\.plg-ai-chip-menu\s*\{[^}]+\}/);
+        expect(chipMenu[0]).toMatch(/left:\s*0/);
+        expect(chipMenu[0]).not.toMatch(/right:\s*0/);
+        expect(css).not.toMatch(/\.jp-float-panel[^{]*\{[^}]*overflow/);
+    });
+
+    test('bundle requires jPulse >=2.0.5', () => {
+        const core = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/plugin.json'),
+            'utf8'
+        );
+        const mock = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-mock/plugin.json'),
+            'utf8'
+        );
+        const hello = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/hello-ai/plugin.json'),
+            'utf8'
+        );
+        expect(core).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
+        expect(mock).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
+        expect(hello).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
     });
 });
 
