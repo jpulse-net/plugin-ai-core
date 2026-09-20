@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.11
+ * @version         1.0.12
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -72,6 +72,7 @@ if (!window.jPulse) {
         slashCostUnknown: '{{i18n.view.ui.ai.slash.costUnknown}}',
         slashSourcesNone: '{{i18n.view.ui.ai.slash.sourcesNone}}',
         slashSourcesCap: '{{i18n.view.ui.ai.slash.sourcesCap}}',
+        slashImagesCap: '{{i18n.view.ui.ai.slash.imagesCap}}',
         slashStatusTransport: '{{i18n.view.ui.ai.slash.statusTransport}}',
         slashStatusThread: '{{i18n.view.ui.ai.slash.statusThread}}',
         slashStatusModel: '{{i18n.view.ui.ai.slash.statusModel}}',
@@ -2305,8 +2306,15 @@ if (!window.jPulse) {
             if (!lines.length) {
                 lines.push(I18N.slashSourcesNone);
             }
-            if (cap.maxSourcesPerConversation) {
-                lines.push(`${I18N.slashSourcesCap}: ${state.sources.length} / ${cap.maxSourcesPerConversation}`);
+            if (cap.sourcesEnabled !== false && cap.maxSourcesPerConversation) {
+                lines.push(fillToken(
+                    fillToken(I18N.slashSourcesCap, '%USED%', state.sources.length),
+                    '%MAX%',
+                    cap.maxSourcesPerConversation
+                ));
+            }
+            if (cap.imagesEnabled !== false) {
+                lines.push(`${I18N.slashImagesCap}: ${state.images.length}`);
             }
             return lines.join('\n');
         }

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.11
+ * @version         1.0.12
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -556,6 +556,24 @@ describe('1.0.11 chip tooltip, switch confirm, compose Enter', () => {
         const body = panel.slice(start, start + 180);
         expect(body.indexOf('stopPropagation')).toBeGreaterThan(-1);
         expect(body.indexOf('stopPropagation')).toBeLessThan(body.indexOf('els.send.click'));
+    });
+});
+
+describe('1.0.12 /sources footer counts both families', () => {
+    test('runSources lists images and does not use sources.length as the only count', () => {
+        const body = fnBody('runSources');
+        expect(body).toMatch(/state\.sources\.forEach/);
+        expect(body).toMatch(/state\.images\.forEach/);
+        expect(body).toMatch(/fillToken\(I18N\.slashSourcesCap, '%USED%', state\.sources\.length\)/);
+        expect(body).toMatch(/'%MAX%'/);
+        expect(body).toMatch(/I18N\.slashImagesCap.*state\.images\.length/);
+        expect(body).not.toMatch(
+            /slashSourcesCap\}: \$\{state\.sources\.length\} \/ \$\{cap\.maxSourcesPerConversation\}/
+        );
+        expect(enConf).toMatch(/sourcesCap:\s*'Sources: %USED% of %MAX% maximum'/);
+        expect(enConf).toMatch(/imagesCap:\s*'Images'/);
+        expect(deConf).toMatch(/sourcesCap:\s*'Quellen: %USED% von maximal %MAX%'/);
+        expect(deConf).toMatch(/imagesCap:\s*'Bilder'/);
     });
 });
 

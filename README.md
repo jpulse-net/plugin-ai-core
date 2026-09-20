@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.11
+# jPulse Framework / Plugins / AI Core Plugin v1.0.12
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.12**, W-239, 2026-09-19: `/sources` footer names how many sources are used of the maximum, then the image count. The source cap does not include images. A listed PNG is not missing from the count.
 - **1.0.11**, W-238, 2026-09-19: Blocked chip Attach uses `jp-tooltip`, not `title`. Enabling Attach (or a new reason) unbinds that tooltip. A conversation switch confirm says Switch, not New conversation. Compose Enter does not bubble to the host page. The AI WebSocket pattern registers on the host `WebSocketController`, so a `plugins/ai-core` symlink still serves `/api/1/ws/ai/:threadId`.
 - **1.0.10**, W-237, 2026-09-19: Chip ⋯ Attach when `adapter.attach` exists. `create()` forwards `mobile`, `defaults`, `minWidth`, and `minHeight`. Compose pads `safe-area-inset-bottom`. `destroy()` cancels a running turn. `/new` and a chip-dropping thread switch confirm. `handle.setTitle`. WebSocket turns carry `session.user`. Send queues until the socket is open; requires jPulse `>=2.0.5`.
 - **1.0.9**, W-234, 2026-09-19: Image chips stay on Send, same as text and URL chips. The Redis mailbox peeks and is deleted only on ✕, `/new`, thread switch, or reload.

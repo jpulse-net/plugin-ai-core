@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Panel Strip
  * @tagline         Chip lifetime, mailbox delete routes, and send-time strip contracts
  * @file            plugins/ai-core/webapp/tests/unit/panel-strip.test.js
- * @version         1.0.11
+ * @version         1.0.12
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -154,6 +154,13 @@ describe('prior strip regressions stay closed', () => {
         const unbind = fnBody('unbindChipAttachTooltip');
         expect(unbind).toMatch(/cloneNode\(true\)/);
         expect(unbind).toMatch(/parentNode\.removeChild\(popup\)/);
+    });
+
+    test('/sources footer counts sources and images separately', () => {
+        const body = fnBody('runSources');
+        expect(body).toMatch(/I18N\.slashImagesCap/);
+        expect(body).toMatch(/state\.images\.length/);
+        expect(body.indexOf('slashImagesCap')).toBeGreaterThan(body.indexOf('slashSourcesCap'));
     });
 
     test('switch confirm does not reuse New conversation as the primary', () => {

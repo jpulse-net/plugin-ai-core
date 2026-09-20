@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.11
+ * @version         1.0.12
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

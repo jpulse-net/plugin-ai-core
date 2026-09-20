@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.11
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.12
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -161,7 +161,7 @@ Resolved in the panel; none are sent to the model. Omit `commands` and the panel
 | `/cancel` | Cancel the running turn, or say that none is running |
 | `/conversations` | List the last 20; `/conversations 3` opens one. Alias `/resume` |
 | `/quota` | Remaining caps from the capability probe. Hidden when the probe has no rows |
-| `/sources` | Attached sources and images. Hidden when sources and images are disabled |
+| `/sources` | Attached sources and images. Footer names how many sources are used of the maximum, then the image count. Hidden when sources and images are disabled |
 | `/status` | Conversation count, turns in the current conversation, transport, thread, pair, and idle or running. Always listed |
 | `/context` | Current context, target, and options. Hidden unless `adapter.contextOptions` exists |
 
@@ -243,6 +243,7 @@ Site Configuration → AI holds the master switch, roles, models, quota, loop li
 
 ## Plugin releases
 
+- **1.0.12**, W-239, 2026-09-19: `/sources` footer names how many sources are used of the maximum, then the image count. The source cap does not include images. A listed PNG is not missing from the count.
 - **1.0.11**, W-238, 2026-09-19: Blocked chip Attach uses `jp-tooltip`, not `title`. Enabling Attach (or a new reason) unbinds that tooltip. A conversation switch confirm says Switch, not New conversation. Compose Enter does not bubble to the host page. The AI WebSocket pattern registers on the host `WebSocketController`, so a `plugins/ai-core` symlink still serves `/api/1/ws/ai/:threadId`.
 - **1.0.10**, W-237, 2026-09-19: Chip ⋯ Attach when `adapter.attach` exists. `create()` forwards `mobile`, `defaults`, `minWidth`, and `minHeight`. Compose pads `safe-area-inset-bottom`. `destroy()` cancels a running turn. `/new` and a chip-dropping thread switch confirm. `handle.setTitle`. WebSocket turns carry `session.user`. Send queues until the socket is open; requires jPulse `>=2.0.5`.
 - **1.0.9**, W-234, 2026-09-19: Image chips stay on Send, same as text and URL chips. The Redis mailbox peeks and is deleted only on ✕, `/new`, thread switch, or reload.
