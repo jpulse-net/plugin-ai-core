@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -829,6 +829,11 @@ if (!window.jPulse) {
             document.body.appendChild(root);
         }
         let pinMessages = function () {};
+        const resetRect = {
+            w: 420,
+            h: 560,
+            ...(options.defaults || {})
+        };
         const handle = jPulse.UI.floatPanel.create({
             id: panelId,
             el: root,
@@ -2478,7 +2483,16 @@ if (!window.jPulse) {
             if (!state.threadId) {
                 return;
             }
-            await jPulse.api.post(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/cancel`);
+            const res = await jPulse.api.post(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/cancel`);
+            if (!res.success) {
+                showToast(res.error || I18N.error, 'error');
+                return;
+            }
+            setRunning(false);
+            state.pendingUser = '';
+            state.streaming = '';
+            showNotice('', false);
+            await renderTurns();
         }
 
         async function sendText(text, script) {
@@ -3256,6 +3270,19 @@ if (!window.jPulse) {
             });
         }
         els.cancel.addEventListener('click', cancelTurn);
+        if (options.resetOnTitleDblclick !== false) {
+            const toolbar = root.querySelector('.plg-ai-toolbar');
+            if (toolbar) {
+                toolbar.addEventListener('dblclick', (event) => {
+                    if (event.target.closest('button, a, input, select, textarea, [data-jp-panel-close]')) {
+                        return;
+                    }
+                    if (handle && typeof handle.setRect === 'function') {
+                        handle.setRect({ x: null, y: null, w: resetRect.w, h: resetRect.h });
+                    }
+                });
+            }
+        }
         els.newer.addEventListener('click', async () => {
             if (!(await confirmDropAttachments())) {
                 return;

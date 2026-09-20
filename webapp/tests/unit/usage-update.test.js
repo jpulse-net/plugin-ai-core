@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Usage Update
  * @tagline         Upsert updates must not overlap $setOnInsert and $inc paths
  * @file            plugins/ai-core/webapp/tests/unit/usage-update.test.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

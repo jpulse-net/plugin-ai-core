@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Threads
  * @tagline         One active thread per scope and user
  * @file            plugins/ai-core/webapp/tests/unit/threads.test.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,6 +13,7 @@
 
 import { describe, expect, test } from '@jest/globals';
 import AiThreadModel, { AI_THREADS_INDEXES } from '../../model/aiThread.js';
+import AiTurnModel from '../../model/aiTurn.js';
 import { memoryCollection } from './helpers.js';
 
 describe('threads', () => {
@@ -193,6 +194,83 @@ describe('threads', () => {
         const again = await AiThreadModel.setProviderModel(thread._id, 'ai-mock', 'mock-unpriced');
         expect(again.model).toBe('mock-unpriced');
         expect(again.label).toBe('Outline');
+    });
+
+    test('threadIdsWithTurns returns only ids with at least one turn', async () => {
+        const turns = memoryCollection();
+        AiTurnModel.useCollection(turns);
+        await AiTurnModel.create({
+            threadId: 'alive',
+            seq: 1,
+            userText: 'hello',
+            createdBy: 'jdoe'
+        });
+        const ids = await AiTurnModel.threadIdsWithTurns(['alive', 'empty', '']);
+        expect([...ids]).toEqual(['alive']);
+    });
+
+    test('threadIdsWithTurns empty input is a no-query empty set', async () => {
+        const turns = memoryCollection();
+        let finds = 0;
+        const origFind = turns.find.bind(turns);
+        turns.find = function (query) {
+            finds += 1;
+            return origFind(query);
+        };
+        AiTurnModel.useCollection(turns);
+        const none = await AiTurnModel.threadIdsWithTurns([]);
+        expect(none.size).toBe(0);
+        expect(finds).toBe(0);
+        const alsoNone = await AiTurnModel.threadIdsWithTurns(null);
+        expect(alsoNone.size).toBe(0);
+        expect(finds).toBe(0);
+    });
+
+    test('list omits archived threads with zero surviving turns and keeps the rest', async () => {
+        const threads = memoryCollection();
+        const turns = memoryCollection();
+        AiThreadModel.useCollection(threads);
+        AiTurnModel.useCollection(turns);
+        const husk = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-husk',
+            createdBy: 'jdoe',
+            label: 'Husk'
+        });
+        await AiThreadModel.archive(husk._id);
+        const kept = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-husk',
+            createdBy: 'jdoe',
+            label: 'Kept archive'
+        });
+        await AiTurnModel.create({
+            threadId: String(kept._id),
+            seq: 1,
+            userText: 'still here',
+            createdBy: 'jdoe'
+        });
+        await AiThreadModel.archive(kept._id);
+        const active = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-husk',
+            createdBy: 'jdoe',
+            label: 'Active empty'
+        });
+        const listed = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-husk',
+            limit: 100
+        });
+        const withTurns = await AiTurnModel.threadIdsWithTurns(listed.map((row) => row._id));
+        const visible = listed.filter((row) => (
+            row.status !== 'archived' || withTurns.has(String(row._id))
+        ));
+        expect(visible.map((row) => row.label).sort()).toEqual(['Active empty', 'Kept archive']);
+        expect(visible.some((row) => String(row._id) === String(husk._id))).toBe(false);
+        expect(visible.some((row) => String(row._id) === String(active._id))).toBe(true);
+        expect(visible.some((row) => String(row._id) === String(kept._id))).toBe(true);
     });
 });
 

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -556,6 +556,57 @@ describe('1.0.11 chip tooltip, switch confirm, compose Enter', () => {
         const body = panel.slice(start, start + 180);
         expect(body.indexOf('stopPropagation')).toBeGreaterThan(-1);
         expect(body.indexOf('stopPropagation')).toBeLessThan(body.indexOf('els.send.click'));
+    });
+});
+
+describe('1.0.13 cancel unsticks, toolbar reset, tab label, empty archives', () => {
+    test('cancelTurn unsticks after POST and is not only the transport handler', () => {
+        const body = fnBody('cancelTurn');
+        expect(body).toMatch(/jPulse\.api\.post/);
+        expect(body).toMatch(/\/cancel/);
+        expect(body).toMatch(/setRunning\(false\)/);
+        expect(body).toMatch(/state\.pendingUser = ''/);
+        expect(body).toMatch(/state\.streaming = ''/);
+        expect(body).toMatch(/showNotice\('', false\)/);
+        expect(body).toMatch(/await renderTurns\(\)/);
+        expect(body.indexOf('/cancel')).toBeLessThan(body.indexOf('setRunning(false)'));
+        expect(body.indexOf('if (!res.success)')).toBeLessThan(body.indexOf('setRunning(false)'));
+        const onStart = panel.indexOf('transport.on(');
+        const onSlice = panel.slice(onStart, onStart + 1600);
+        expect(onSlice).toMatch(/event\.type === 'canceled'/);
+        expect(onSlice).toMatch(/setRunning\(false\)/);
+    });
+
+    test('toolbar dblclick resets size and corner; close is ignored', () => {
+        expect(panel).toMatch(/const resetRect = \{/);
+        expect(panel).toMatch(/options\.resetOnTitleDblclick !== false/);
+        expect(panel).toMatch(/querySelector\('\.plg-ai-toolbar'\)/);
+        expect(panel).toMatch(/addEventListener\('dblclick'/);
+        expect(panel).not.toMatch(/\.plg-ai-thread-row[\s\S]{0,120}addEventListener\('dblclick'/);
+        expect(panel).toMatch(/\[data-jp-panel-close\]/);
+        expect(panel).toMatch(/setRect\(\{ x: null, y: null, w: resetRect\.w, h: resetRect\.h \}\)/);
+        expect(panel).not.toMatch(/resetOnTitleDblclick: options/);
+    });
+
+    test('config tabLabel is AI Agent / KI-Agent', () => {
+        expect(enConf).toMatch(/tabLabel:\s*'AI Agent'/);
+        expect(deConf).toMatch(/tabLabel:\s*'KI-Agent'/);
+        expect(enConf).not.toMatch(/tabLabel:\s*'AI',/);
+        expect(deConf).not.toMatch(/tabLabel:\s*'KI',/);
+    });
+
+    test('apiListThreads filters husks then slices', () => {
+        const src = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/controller/aiCore.js'),
+            'utf8'
+        );
+        const start = src.indexOf('static async apiListThreads');
+        const body = src.slice(start, start + 1400);
+        expect(body).toMatch(/limit: 100/);
+        expect(body).toMatch(/threadIdsWithTurns/);
+        expect(body).toMatch(/visible\.slice/);
+        expect(body.indexOf('limit: 100')).toBeLessThan(body.indexOf('threadIdsWithTurns'));
+        expect(body.indexOf('threadIdsWithTurns')).toBeLessThan(body.indexOf('visible.slice'));
     });
 });
 

@@ -3,7 +3,7 @@
  * @tagline         Turn records
  * @description     One user message and everything the agent did in response
  * @file            plugins/ai-core/webapp/model/aiTurn.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -145,6 +145,22 @@ class AiTurnModel {
         const collection = this.getCollection();
         const result = await collection.deleteMany({ createdAt: { $lt: cutoff } });
         return result.deletedCount || 0;
+    }
+
+    /**
+     * Thread ids that still have at least one turn. Empty input is a no-query empty set.
+     * @param {Array<string|object>} ids
+     * @returns {Promise<Set<string>>}
+     */
+    static async threadIdsWithTurns(ids) {
+        const list = (Array.isArray(ids) ? ids : []).map((id) => String(id)).filter(Boolean);
+        if (!list.length) {
+            return new Set();
+        }
+        const rows = await this.getCollection()
+            .find({ threadId: { $in: list } }, { projection: { threadId: 1 } })
+            .toArray();
+        return new Set(rows.map((row) => String(row.threadId)));
     }
 
     static async _update(id, fields) {

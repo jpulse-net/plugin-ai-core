@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -698,15 +698,26 @@ class AiCoreController {
             }
             const { actor } = gated;
             logReq(req, 'aiCore.apiListThreads', actor);
+            const requested = Number(req.query.limit);
+            const hasLimit = Number.isFinite(requested) && requested > 0;
             const threads = await AiThreadModel.listForOwner({
                 createdBy: threadOwner(actor),
                 scopeType: req.query.scopeType,
                 scopeId: req.query.scopeId,
                 status: req.query.status,
-                limit: req.query.limit
+                limit: 100
             });
-            res.json({ success: true, data: threads });
-            logOk(req, 'aiCore.apiListThreads', actor, `${threads.length} threads`);
+            const withTurns = await AiTurnModel.threadIdsWithTurns(
+                threads.map((row) => row && row._id)
+            );
+            const visible = threads.filter((row) => (
+                !row || row.status !== 'archived' || withTurns.has(String(row._id))
+            ));
+            const listed = hasLimit
+                ? visible.slice(0, Math.min(Math.floor(requested), 100))
+                : visible;
+            res.json({ success: true, data: listed });
+            logOk(req, 'aiCore.apiListThreads', actor, `${listed.length} threads`);
         } catch (error) {
             logErr(req, 'aiCore.apiListThreads', actorFromRequest(req), error);
             return sendError(req, res, 500, 'Failed to list threads', 'AI_THREAD_LIST_FAILED');

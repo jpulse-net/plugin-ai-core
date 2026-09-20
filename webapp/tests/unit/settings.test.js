@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.12
+ * @version         1.0.13
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -75,6 +75,21 @@ describe('settings', () => {
         };
         const settings = await loadSettings({ pluginModel, configModel: { findById: async () => null } });
         expect(settings.debugDumps).toBe(true);
+    });
+
+    test('config tabLabel is AI Agent / KI-Agent', () => {
+        const en = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/translations/en.conf'),
+            'utf8'
+        );
+        const de = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/translations/de.conf'),
+            'utf8'
+        );
+        expect(en).toMatch(/tabLabel:\s*'AI Agent'/);
+        expect(de).toMatch(/tabLabel:\s*'KI-Agent'/);
+        expect(en).not.toMatch(/tabLabel:\s*'AI',/);
+        expect(de).not.toMatch(/tabLabel:\s*'KI',/);
     });
 
     test('loadSettings leaves dumps off when plugin config is empty', async () => {
