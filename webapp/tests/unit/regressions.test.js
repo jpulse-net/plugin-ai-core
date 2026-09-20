@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -37,6 +37,33 @@ const css = fs.readFileSync(
     path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.css'),
     'utf8'
 );
+const enConf = fs.readFileSync(
+    path.resolve(process.cwd(), 'plugins/ai-core/webapp/translations/en.conf'),
+    'utf8'
+);
+const deConf = fs.readFileSync(
+    path.resolve(process.cwd(), 'plugins/ai-core/webapp/translations/de.conf'),
+    'utf8'
+);
+
+function fnBody(name) {
+    const start = panel.indexOf(`function ${name}(`);
+    expect(start).toBeGreaterThan(-1);
+    const open = panel.indexOf('{', start);
+    let depth = 0;
+    for (let i = open; i < panel.length; i += 1) {
+        const ch = panel[i];
+        if (ch === '{') {
+            depth += 1;
+        } else if (ch === '}') {
+            depth -= 1;
+            if (depth === 0) {
+                return panel.slice(open, i + 1);
+            }
+        }
+    }
+    return '';
+}
 
 function memoryRedis() {
     const store = new Map();
@@ -397,14 +424,21 @@ describe('1.0.10 chip attach, shell, destroy cancel', () => {
         expect(body.indexOf('/cancel')).toBeLessThan(body.indexOf('transport.disconnect()'));
     });
 
-    test('/new and a chip-dropping switch share one confirm', () => {
+    test('/new and a chip-dropping switch share one confirm helper', () => {
         expect(panel).toMatch(/function confirmDropAttachments/);
         expect(panel).toMatch(/function confirmDropAttachmentsForSwitch/);
         expect(panel).toMatch(/state\.sources\.length \+ state\.images\.length/);
-        expect(panel).toMatch(/I18N\.newConfirmTitle/);
         expect(panel).toMatch(/I18N\.newConfirmBody/);
         expect(panel).toMatch(/confirmDropAttachmentsForSwitch\(thread\._id\)/);
         expect(panel).toMatch(/confirmDropAttachmentsForSwitch\(id\)/);
+        const neu = fnBody('confirmDropAttachments');
+        expect(neu).toMatch(/I18N\.newConfirmTitle/);
+        expect(neu).toMatch(/I18N\.newConversation/);
+        expect(neu).not.toMatch(/I18N\.switchConfirmTitle/);
+        const sw = fnBody('confirmDropAttachmentsForSwitch');
+        expect(sw).toMatch(/I18N\.switchConfirmTitle/);
+        expect(sw).toMatch(/I18N\.switchConfirmAction/);
+        expect(sw).not.toMatch(/confirmDropAttachments\(\);/);
     });
 
     test('startTurn does not wait for the socket and does not treat a false send as an error', () => {
@@ -456,6 +490,72 @@ describe('1.0.10 chip attach, shell, destroy cancel', () => {
         expect(core).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
         expect(mock).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
         expect(hello).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
+    });
+});
+
+describe('1.0.11 chip tooltip, switch confirm, compose Enter', () => {
+    test('blocked Attach uses jp-tooltip, never title=', () => {
+        expect(panel).toMatch(/function syncChipAttachItem/);
+        expect(panel).toMatch(/function unbindChipAttachTooltip/);
+        expect(panel).toMatch(/plg-ai-chip-attach-tip/);
+        expect(panel).not.toMatch(/item\.title\s*=/);
+        expect(panel).not.toMatch(/\.title\s*=\s*gate/);
+        const body = fnBody('syncChipAttachItem');
+        expect(body).toMatch(/classList\.add\('jp-tooltip'\)/);
+        expect(body).toMatch(/setAttribute\('data-tooltip', reason\)/);
+        expect(body).toMatch(/gate\.reason \|\| I18N\.chipAttachBlocked/);
+        expect(body).toMatch(/removeAttribute\('title'\)/);
+        expect(body).not.toMatch(/\.title\s*=/);
+        expect(body).toMatch(/unbindChipAttachTooltip\(tip\)/);
+        expect(body).toMatch(/gate\.ok \|\| prev !== reason/);
+        expect(body).not.toMatch(/_jpTooltip\.innerHTML/);
+        expect(body).toMatch(/tooltip\.initAll/);
+        expect(css).toMatch(/\.plg-ai-chip-attach-tip/);
+    });
+
+    test('enabled Attach destroys the blocked tooltip, not just closeActive', () => {
+        const unbind = fnBody('unbindChipAttachTooltip');
+        expect(unbind).toMatch(/tip\._jpTooltip/);
+        expect(unbind).toMatch(/removeEventListener\('keydown'/);
+        expect(unbind).toMatch(/removeEventListener\('click'/);
+        expect(unbind).toMatch(/parentNode\.removeChild\(popup\)/);
+        expect(unbind).toMatch(/cloneNode\(true\)/);
+        expect(unbind).toMatch(/replaceChild\(clone, tip\)/);
+        expect(unbind).toMatch(/removeAttribute\('data-jp-tooltip-initialized'\)/);
+        expect(unbind).toMatch(/classList\.remove\('jp-tooltip'\)/);
+        const hide = fnBody('hideChipMenus');
+        expect(hide).toMatch(/unbindChipAttachTooltip\(tip\)/);
+    });
+
+    test('switch confirm has its own title and primary', () => {
+        const neu = fnBody('confirmDropAttachments');
+        expect(neu).toMatch(/\(copy && copy\.title\) \|\| I18N\.newConfirmTitle/);
+        expect(neu).toMatch(/\(copy && copy\.action\) \|\| I18N\.newConversation/);
+        expect(neu).toMatch(/I18N\.newConfirmBody/);
+        expect(neu).toMatch(/buttons: \[I18N\.cancel, action\]/);
+        expect(neu).not.toMatch(/I18N\.switchConfirmTitle/);
+        const sw = fnBody('confirmDropAttachmentsForSwitch');
+        expect(sw).toMatch(/title:\s*I18N\.switchConfirmTitle/);
+        expect(sw).toMatch(/action:\s*I18N\.switchConfirmAction/);
+        expect(sw).not.toMatch(/confirmDropAttachments\(\);/);
+        expect(sw).not.toMatch(/I18N\.newConfirmTitle/);
+        expect(sw).not.toMatch(/I18N\.newConversation/);
+        expect(panel).toMatch(/new:\s*async function \(\) \{\s*if \(!\(await confirmDropAttachments\(\)\)\)/);
+        expect(enConf).toMatch(/switchConfirmTitle:\s*'Switch conversation\?'/);
+        expect(enConf).toMatch(/switchConfirmAction:\s*'Switch'/);
+        expect(deConf).toMatch(/switchConfirmTitle:\s*'Gespräch wechseln\?'/);
+        expect(deConf).toMatch(/switchConfirmAction:\s*'Wechseln'/);
+    });
+
+    test('compose Enter stops before send.click', () => {
+        expect(panel).toMatch(
+            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
+        );
+        const start = panel.indexOf("if (event.key === 'Enter' && !event.shiftKey)");
+        expect(start).toBeGreaterThan(-1);
+        const body = panel.slice(start, start + 180);
+        expect(body.indexOf('stopPropagation')).toBeGreaterThan(-1);
+        expect(body.indexOf('stopPropagation')).toBeLessThan(body.indexOf('els.send.click'));
     });
 });
 

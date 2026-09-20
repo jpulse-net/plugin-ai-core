@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Panel Strip
  * @tagline         Chip lifetime, mailbox delete routes, and send-time strip contracts
  * @file            plugins/ai-core/webapp/tests/unit/panel-strip.test.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -136,6 +136,34 @@ describe('prior strip regressions stay closed', () => {
         expect(panel).toMatch(
             /if \(event\.key === 'Enter'\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*saveRename\(\);/
         );
+    });
+
+    test('compose Enter stops before send.click', () => {
+        expect(panel).toMatch(
+            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
+        );
+    });
+
+    test('blocked Attach reason is jp-tooltip on a wrapper, not title=', () => {
+        const body = fnBody('syncChipAttachItem');
+        expect(body).toMatch(/plg-ai-chip-attach-tip/);
+        expect(body).toMatch(/setAttribute\('data-tooltip', reason\)/);
+        expect(body).toMatch(/unbindChipAttachTooltip\(tip\)/);
+        expect(body).not.toMatch(/\.title\s*=/);
+        expect(panel).not.toMatch(/item\.title\s*=/);
+        const unbind = fnBody('unbindChipAttachTooltip');
+        expect(unbind).toMatch(/cloneNode\(true\)/);
+        expect(unbind).toMatch(/parentNode\.removeChild\(popup\)/);
+    });
+
+    test('switch confirm does not reuse New conversation as the primary', () => {
+        const sw = fnBody('confirmDropAttachmentsForSwitch');
+        expect(sw).toMatch(/I18N\.switchConfirmTitle/);
+        expect(sw).toMatch(/I18N\.switchConfirmAction/);
+        expect(sw).not.toMatch(/confirmDropAttachments\(\);/);
+        const neu = fnBody('confirmDropAttachments');
+        expect(neu).toMatch(/I18N\.newConfirmTitle/);
+        expect(neu).toMatch(/I18N\.newConversation/);
     });
 
     test('destroy closes the socket and removes the node', () => {

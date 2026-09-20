@@ -3,7 +3,7 @@
  * @tagline         Reserve-then-settle usage counters
  * @description     Documents keyed subject:period; daily and monthly written on every settle
  * @file            plugins/ai-core/webapp/model/aiUsage.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

@@ -3,7 +3,7 @@
  * @tagline         Per-thread AI namespace and client-host bridge
  * @description     Authorize the handshake, start turns on the socket, call the origin tab
  * @file            plugins/ai-core/webapp/utils/transport/ws.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -12,7 +12,8 @@
  * @genai           80%, Cursor 3.20, Grok 4.6
  */
 
-import WebSocketController from '../../../../../webapp/controller/websocket.js';
+import path from 'path';
+import { pathToFileURL } from 'url';
 import { loadSettings, roleAllowed, runTurn } from '../agent/index.js';
 import AiThreadModel from '../../model/aiThread.js';
 import AiTurnModel from '../../model/aiTurn.js';
@@ -154,12 +155,32 @@ export async function executeClientTool(params) {
     return mapClientReply(reply);
 }
 
-function websocketController(deps) {
-    return deps.WebSocketController || global.WebSocketController || WebSocketController;
+/**
+ * Use the WebSocketController the running app loaded. A static import of
+ * `../../../../../webapp/controller/websocket.js` follows the real file path,
+ * so a `plugins/ai-core` symlink stamps the pattern on the checkout's class
+ * while `_handleUpgrade` runs on the host class.
+ * @param {object} deps
+ * @returns {Promise<object|null>}
+ */
+async function websocketController(deps) {
+    if (deps.WebSocketController) {
+        return deps.WebSocketController;
+    }
+    if (global.WebSocketController) {
+        return global.WebSocketController;
+    }
+    const projectRoot = global.appConfig?.system?.projectRoot;
+    if (!projectRoot) {
+        return null;
+    }
+    const href = pathToFileURL(path.join(projectRoot, 'webapp', 'controller', 'websocket.js')).href;
+    const mod = await import(href);
+    return mod.default || null;
 }
 
-export function registerAiNamespace(deps = {}) {
-    const WS = websocketController(deps);
+export async function registerAiNamespace(deps = {}) {
+    const WS = await websocketController(deps);
     if (!WS?.createNamespace) {
         return null;
     }

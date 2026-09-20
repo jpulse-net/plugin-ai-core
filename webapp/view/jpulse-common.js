@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -22,6 +22,8 @@ if (!window.jPulse) {
         newConversation: '{{i18n.view.ui.ai.panel.newConversation}}',
         newConfirmTitle: '{{i18n.view.ui.ai.panel.newConfirmTitle}}',
         newConfirmBody: '{{i18n.view.ui.ai.panel.newConfirmBody}}',
+        switchConfirmTitle: '{{i18n.view.ui.ai.panel.switchConfirmTitle}}',
+        switchConfirmAction: '{{i18n.view.ui.ai.panel.switchConfirmAction}}',
         rename: '{{i18n.view.ui.ai.panel.rename}}',
         send: '{{i18n.view.ui.ai.panel.send}}',
         cancel: '{{i18n.view.ui.ai.panel.cancel}}',
@@ -1330,7 +1332,9 @@ if (!window.jPulse) {
             return `<span class="plg-ai-chip-more-wrap">`
                 + `<button type="button" class="plg-ai-chip-more" data-chip-more="${escapeHtml(id)}" data-chip-kind="${kind}" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(I18N.chipAttach)}">⋯</button>`
                 + `<div class="plg-ai-chip-menu" hidden role="menu">`
+                + `<span class="plg-ai-chip-attach-tip">`
                 + `<button type="button" class="plg-ai-chip-attach" data-chip-attach="${escapeHtml(id)}" data-chip-kind="${kind}" role="menuitem">${escapeHtml(I18N.chipAttach)}</button>`
+                + `</span>`
                 + `</div></span>`;
         }
 
@@ -1690,15 +1694,17 @@ if (!window.jPulse) {
             return state.sources.length + state.images.length;
         }
 
-        async function confirmDropAttachments() {
+        async function confirmDropAttachments(copy) {
             if (attachmentCount() === 0) {
                 return true;
             }
+            const title = (copy && copy.title) || I18N.newConfirmTitle;
+            const action = (copy && copy.action) || I18N.newConversation;
             if (jPulse.UI && typeof jPulse.UI.confirmDialog === 'function') {
                 const result = await jPulse.UI.confirmDialog({
-                    title: I18N.newConfirmTitle,
+                    title: title,
                     message: I18N.newConfirmBody,
-                    buttons: [I18N.cancel, I18N.newConversation]
+                    buttons: [I18N.cancel, action]
                 });
                 return !!(result && result.confirmed);
             }
@@ -1710,7 +1716,10 @@ if (!window.jPulse) {
             if (sameThread || attachmentCount() === 0) {
                 return true;
             }
-            return confirmDropAttachments();
+            return confirmDropAttachments({
+                title: I18N.switchConfirmTitle,
+                action: I18N.switchConfirmAction
+            });
         }
 
         function sourceRefsBadge(turn) {
@@ -2710,6 +2719,7 @@ if (!window.jPulse) {
             }
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
+                event.stopPropagation();
                 els.send.click();
             }
         });
@@ -2731,6 +2741,41 @@ if (!window.jPulse) {
             }
         }
 
+        function unbindChipAttachTooltip(tip) {
+            if (!tip) {
+                return tip;
+            }
+            const popup = tip._jpTooltip;
+            if (jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.closeActive === 'function') {
+                jPulse.UI.tooltip.closeActive();
+            }
+            if (popup) {
+                if (popup._escapeHandler) {
+                    document.removeEventListener('keydown', popup._escapeHandler);
+                    popup._escapeHandler = null;
+                }
+                if (popup._outsideClickHandler) {
+                    document.removeEventListener('click', popup._outsideClickHandler);
+                    popup._outsideClickHandler = null;
+                }
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+                tip._jpTooltip = null;
+            }
+            delete tip.dataset.jpTooltipInitialized;
+            tip.removeAttribute('data-jp-tooltip-initialized');
+            tip.removeAttribute('aria-describedby');
+            tip.classList.remove('jp-tooltip');
+            tip.removeAttribute('data-tooltip');
+            if (!tip.parentNode) {
+                return tip;
+            }
+            const clone = tip.cloneNode(true);
+            tip.parentNode.replaceChild(clone, tip);
+            return clone;
+        }
+
         function hideChipMenus(except) {
             if (!els.chips) {
                 return;
@@ -2745,6 +2790,10 @@ if (!window.jPulse) {
                 const more = menu.parentNode && menu.parentNode.querySelector('.plg-ai-chip-more');
                 if (more) {
                     more.setAttribute('aria-expanded', 'false');
+                }
+                const tip = menu.querySelector('.plg-ai-chip-attach-tip');
+                if (tip && (tip._jpTooltip || tip.dataset.jpTooltipInitialized === 'true')) {
+                    unbindChipAttachTooltip(tip);
                 }
             });
         }
@@ -2766,6 +2815,33 @@ if (!window.jPulse) {
             }
         }
 
+        function syncChipAttachItem(item, gate) {
+            let tip = (item.closest && item.closest('.plg-ai-chip-attach-tip')) || item;
+            item.disabled = !gate.ok;
+            item.removeAttribute('title');
+            if (tip !== item) {
+                tip.removeAttribute('title');
+            }
+            const reason = gate.ok ? '' : (gate.reason || I18N.chipAttachBlocked);
+            const prev = tip.getAttribute('data-tooltip') || '';
+            const bound = tip.dataset.jpTooltipInitialized === 'true' || !!tip._jpTooltip;
+            if (bound && (gate.ok || prev !== reason)) {
+                tip = unbindChipAttachTooltip(tip);
+                item = (tip.querySelector && tip.querySelector('[data-chip-attach]')) || item;
+                item.disabled = !gate.ok;
+                item.removeAttribute('title');
+            }
+            if (gate.ok) {
+                return;
+            }
+            tip.classList.add('jp-tooltip');
+            tip.setAttribute('data-tooltip', reason);
+            if (!(jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.initAll === 'function')) {
+                return;
+            }
+            jPulse.UI.tooltip.initAll(tip.parentNode || tip);
+        }
+
         function toggleChipMenu(more) {
             const wrap = more && more.closest('.plg-ai-chip-more-wrap');
             const menu = wrap && wrap.querySelector('.plg-ai-chip-menu');
@@ -2783,12 +2859,7 @@ if (!window.jPulse) {
                 const gate = attachGate(row);
                 const item = menu.querySelector('[data-chip-attach]');
                 if (item) {
-                    item.disabled = !gate.ok;
-                    if (gate.ok) {
-                        item.removeAttribute('title');
-                    } else {
-                        item.title = gate.reason || I18N.chipAttachBlocked;
-                    }
+                    syncChipAttachItem(item, gate);
                 }
                 positionChipMenu(menu, more);
                 if (jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.closeActive === 'function') {

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / WS Bridge
  * @tagline         Namespace authorization and client-host mapping
  * @file            plugins/ai-core/webapp/tests/unit/ws-bridge.test.js
- * @version         1.0.10
+ * @version         1.0.11
  * @release         2026-09-19
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -15,7 +15,13 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import { chooseTransport } from '../../utils/transport/index.js';
-import { authorizeAiSocket, executeClientTool, mapClientReply } from '../../utils/transport/ws.js';
+import {
+    AI_WS_PATTERN,
+    authorizeAiSocket,
+    executeClientTool,
+    mapClientReply,
+    registerAiNamespace
+} from '../../utils/transport/ws.js';
 import {
     AI_CLIENT_HOST,
     AI_RESULT_TOO_LARGE,
@@ -251,6 +257,53 @@ describe('client-host bridge', () => {
         expect(result.code).toBe(AI_CLIENT_HOST);
         expect(chooseTransport([{ host: 'server' }])).toBe('http');
         expect(chooseTransport([{ host: 'client' }])).toBe('ws');
+    });
+});
+
+describe('registerAiNamespace host controller', () => {
+    test('does not import host websocket.js via a plugin-escaping relative path', () => {
+        const src = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/transport/ws.js'),
+            'utf8'
+        );
+        expect(src).not.toMatch(/from\s+['"](?:\.\.\/){5}webapp\/controller\/websocket\.js['"]/);
+        expect(src).toMatch(/global\.WebSocketController/);
+        expect(src).toMatch(/projectRoot/);
+    });
+
+    test('stamps the pattern on global.WebSocketController', async () => {
+        const created = [];
+        const live = {
+            createNamespace(nsPath) {
+                created.push(nsPath);
+                return {
+                    onMessage() { return this; },
+                    onDisconnect() { return this; }
+                };
+            }
+        };
+        const prev = global.WebSocketController;
+        global.WebSocketController = live;
+        try {
+            const ns = await registerAiNamespace();
+            expect(ns).toBeTruthy();
+            expect(created).toEqual([AI_WS_PATTERN]);
+        } finally {
+            global.WebSocketController = prev;
+        }
+    });
+
+    test('returns null when no host controller is available', async () => {
+        const prevWs = global.WebSocketController;
+        const prevCfg = global.appConfig;
+        global.WebSocketController = undefined;
+        global.appConfig = {};
+        try {
+            expect(await registerAiNamespace()).toBeNull();
+        } finally {
+            global.WebSocketController = prevWs;
+            global.appConfig = prevCfg;
+        }
     });
 });
 
