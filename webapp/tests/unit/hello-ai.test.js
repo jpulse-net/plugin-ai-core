@@ -285,7 +285,7 @@ describe('adapter contract scan', () => {
         expect(panel).not.toMatch(/synapse/);
         expect(panel).not.toMatch(/const SLASH_COMMANDS = \['help'/);
         expect(panel).toMatch(
-            /async function openThread\(threadId, options\) \{[\s\S]*?await refreshThreads\(\);[\s\S]*?\/turns/
+            /async function openThread\(threadId, options\) \{[\s\S]*?if \(!currentThread\(\)\) \{\s*await refreshThreads\(\);[\s\S]*?\/turns/
         );
         expect(panel).toMatch(/typeof options\.title === 'string'/);
         expect(panel).toMatch(/storageKey: options\.storageKey/);

@@ -2061,7 +2061,9 @@ if (!window.jPulse) {
                 await showEmptyThread();
                 return;
             }
-            await refreshThreads();
+            if (!currentThread()) {
+                await refreshThreads();
+            }
             if (!currentThread()) {
                 await showEmptyThread();
                 return;
