@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.13
- * @release         2026-09-19
+ * @version         1.0.14
+ * @release         2026-09-20
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -434,6 +434,44 @@ describe('turn loop', () => {
         const result = await running;
         expect(result.status).toBe('canceled');
         expect(Date.now() - started).toBeLessThan(2000);
+    });
+
+    test('prompt dump is logDebug when debugDumps and the aiCore area are on', async () => {
+        const info = [];
+        const debug = [];
+        const originalInfo = global.LogController.logInfo.bind(global.LogController);
+        const originalDebug = global.LogController.logDebug.bind(global.LogController);
+        global.LogController.logInfo = (req, scope, msg) => {
+            info.push({ scope, msg });
+            return originalInfo(req, scope, msg);
+        };
+        global.LogController.logDebug = (req, scope, msg) => {
+            debug.push({ scope, msg });
+            return originalDebug(req, scope, msg);
+        };
+        await global.LogController.setDebugAreas(['aiCore']);
+        try {
+            const thread = await seedThread();
+            const result = await runTurn({
+                actor: testActor(),
+                thread,
+                userText: '[mock:text] Hello',
+                settings: { ...settings, debugDumps: true },
+                hookManager: hooksWith(),
+                threadModel: AiThreadModel,
+                turnModel: AiTurnModel,
+                usageModel: AiUsageModel,
+                redisManager: { isRedisAvailable: () => false }
+            });
+            expect(result.status).toBe('completed');
+            expect(debug.some((line) => line.scope === 'aiCore.runTurn' && line.msg.startsWith('prompt:'))).toBe(true);
+            expect(info.some((line) => line.scope === 'aiCore.runTurn' && line.msg.startsWith('prompt:'))).toBe(false);
+            expect(info.some((line) => line.scope === 'aiCore.runTurn' && line.msg.includes('success: turn'))).toBe(true);
+        } finally {
+            global.LogController.logInfo = originalInfo;
+            global.LogController.logDebug = originalDebug;
+            await global.LogController.setDebugAreas([]);
+        }
     });
 });
 

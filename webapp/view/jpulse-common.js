@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.13
- * @release         2026-09-19
+ * @version         1.0.14
+ * @release         2026-09-20
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -532,6 +532,32 @@ if (!window.jPulse) {
         }
     }
 
+    function threadStorageKey(username, scopeType, scopeId) {
+        const who = String(username || '').trim() || '_anon';
+        return `jp:ai:thread:${who}:${scopeType}:${scopeId}`;
+    }
+
+    function legacyThreadStorageKey(scopeType, scopeId) {
+        return `jp:ai:thread:${scopeType}:${scopeId}`;
+    }
+
+    function rememberedThreadId(userStored, legacyStored, threads) {
+        const owned = new Set(
+            (threads || [])
+                .filter((thread) => thread && thread._id != null)
+                .map((thread) => String(thread._id))
+        );
+        const userId = String(userStored || '');
+        if (userId && owned.has(userId)) {
+            return userId;
+        }
+        const legacyId = String(legacyStored || '');
+        if (legacyId && owned.has(legacyId)) {
+            return legacyId;
+        }
+        return '';
+    }
+
     function createTransport(options) {
         const listeners = [];
         let capability = null;
@@ -756,7 +782,8 @@ if (!window.jPulse) {
         const title = (typeof options.title === 'string' && options.title.trim())
             ? options.title
             : I18N.title;
-        const threadKey = `jp:ai:thread:${scopeType}:${scopeId}`;
+        const legacyThreadKey = legacyThreadStorageKey(scopeType, scopeId);
+        let threadKey = legacyThreadKey;
         const panelStore = { sources: [], images: [], files: new Map(), caps: {} };
         const transport = createTransport({
             scopeType: scopeType,
@@ -874,7 +901,7 @@ if (!window.jPulse) {
 
         const state = {
             threads: [],
-            threadId: localStorage.getItem(threadKey) || '',
+            threadId: '',
             turns: [],
             locals: [],
             streaming: '',
@@ -2005,6 +2032,19 @@ if (!window.jPulse) {
             pinMessages();
         }
 
+        async function showEmptyThread() {
+            if (transport && typeof transport.disconnect === 'function') {
+                transport.disconnect();
+            }
+            state.threadId = '';
+            state.turns = [];
+            applyThreadModel(null);
+            await renderTurns();
+            renderThreads();
+            loadThreadContext();
+            emitRegionEvent('thread');
+        }
+
         async function openThread(threadId, options) {
             const sameThread = String(threadId || '') === state.threadId;
             if (!sameThread) {
@@ -2017,21 +2057,22 @@ if (!window.jPulse) {
             state.pendingUser = '';
             state.streaming = '';
             cancelRename();
-            if (state.threadId) {
-                localStorage.setItem(threadKey, state.threadId);
-            }
             if (!state.threadId) {
-                state.turns = [];
-                applyThreadModel(null);
-                await renderTurns();
-                renderThreads();
-                loadThreadContext();
-                emitRegionEvent('thread');
+                await showEmptyThread();
                 return;
             }
             await refreshThreads();
+            if (!currentThread()) {
+                await showEmptyThread();
+                return;
+            }
+            localStorage.setItem(threadKey, state.threadId);
             const res = await jPulse.api.get(`/api/1/ai/thread/${encodeURIComponent(state.threadId)}/turns`);
-            state.turns = res.success ? (res.data || []) : [];
+            if (!res.success) {
+                await showEmptyThread();
+                return;
+            }
+            state.turns = res.data || [];
             applyThreadModel(currentThread());
             const running = state.turns.some((turn) => turn.status === 'running');
             setRunning(running);
@@ -3324,11 +3365,15 @@ if (!window.jPulse) {
             try {
                 const capability = await refreshCapability();
                 state.capability = capability;
+                threadKey = threadStorageKey(capability && capability.username, scopeType, scopeId);
                 applyThreadModel(currentThread());
                 if (capability.retentionDays) {
                     showNotice(fillToken(I18N.retention, '%DAYS%', String(capability.retentionDays)), true);
                 }
                 await refreshThreads();
+                const userStored = localStorage.getItem(threadKey) || '';
+                const legacyStored = localStorage.getItem(legacyThreadKey) || '';
+                state.threadId = rememberedThreadId(userStored, legacyStored, state.threads);
                 if (state.threadId) {
                     await openThread(state.threadId);
                 } else if (state.threads[0]) {

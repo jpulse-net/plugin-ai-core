@@ -3,8 +3,8 @@
  * @tagline         Admin tool policy with union-with-reviewed-names
  * @description     A newly added tool is on by default; an explicitly unchecked tool stays off
  * @file            plugins/ai-core/webapp/utils/tools/policy.js
- * @version         1.0.13
- * @release         2026-09-19
+ * @version         1.0.14
+ * @release         2026-09-20
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

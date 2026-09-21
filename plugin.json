@@ -1,12 +1,12 @@
 {
     "name": "ai-core",
     "npmPackage": "@jpulse-net/plugin-ai-core",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2\"/><path d=\"M20 14h2\"/><path d=\"M15 13v2\"/><path d=\"M9 13v2\"/></svg>",
     "summary": "AI agent: tools, turns, quota, chat panel, attachments, and propose/apply",
     "description": "<p>Gives a jPulse site an AI agent by configuration rather than by building one. A site registers scope and tools through hooks; the plugin runs turns, enforces authorization and quota, and streams replies over HTTP or a per-thread WebSocket.</p><ul><li><strong>Tools layer:</strong> named capabilities, four authorization gates, declarative per-turn budgets, shared <code>utils/ai-tools/</code> modules</li><li><strong>Agent layer:</strong> turn loop, provider contract, prompt assembly, reserve-then-settle quota</li><li><strong>Attachments:</strong> tab-local sources, URL ingest, document-conversion call path, and Redis image staging</li><li><strong>Panel:</strong> <code>jPulse.ai.panel.create({ scopeType, scopeId })</code> — HTTP until a client-host tool is offered</li></ul><p>Installs together with <code>ai-mock</code> and the <code>hello-ai</code> sample as <code>@jpulse-net/plugin-ai-core</code>. Disable Hello AI to hide the demo without turning off AI. A commercial provider is a separate package.</p>",
     "author": "jPulse Team <team@jpulse.net>",
-    "jpulseVersion": ">=2.0.5",
+    "jpulseVersion": ">=2.0.8",
     "autoEnable": true,
     "bundle": {
         "members": ["ai-mock", "hello-ai"]
@@ -27,7 +27,7 @@
                 "label": "Write debug dumps",
                 "type": "boolean",
                 "default": false,
-                "help": "Log assembled prompts and tool results. Off by default. Do not leave this on in production.",
+                "help": "Log assembled prompts and tool results. Off by default. Also requires the host aiCore debug area. Do not leave this on in production.",
                 "tab": "General"
             }
         ]

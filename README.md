@@ -1,8 +1,8 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.13
+# jPulse Framework / Plugins / AI Core Plugin v1.0.14
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
-Requires jPulse Framework >= 2.0.5 (`jPulse.ws` queues a send until the socket is open).
+Requires jPulse Framework >= 2.0.8 (`logDebug` for prompt/response dumps; `jPulse.ws` queues a send until the socket is open).
 
 ## Install
 
@@ -10,7 +10,7 @@ Requires jPulse Framework >= 2.0.5 (`jPulse.ws` queues a send until the socket i
 npx jpulse plugin install @jpulse-net/plugin-ai-core
 ```
 
-That one command installs `ai-core`, `ai-mock`, and `hello-ai`. All three have `autoEnable: true`. Set the master switch, roles, and quota on Site Configuration → AI Agent. Usage is Admin → AI usage. Plugin-local settings (including debug dumps, off by default) are on Admin → Plugins → ai-core. Live capability is `/jpulse-plugins/ai-core.shtml`. Open `/hello-ai/` to confirm the install (no API key). Disable the Hello AI plugin to hide that demo without turning off AI.
+That one command installs `ai-core`, `ai-mock`, and `hello-ai`. All three have `autoEnable: true`. Set the master switch, roles, and quota on Site Configuration → AI Agent. Usage is Admin → AI usage. Plugin-local settings (including debug dumps, off by default) are on Admin → Plugins → ai-core. Prompt/response dumps print only when that setting is on **and** the host `aiCore` debug area is enabled. Live capability is `/jpulse-plugins/ai-core.shtml`. Open `/hello-ai/` to confirm the install (no API key). Disable the Hello AI plugin to hide that demo without turning off AI. The panel remembers the last-open thread per user; it does not reopen another person's conversation from a shared browser.
 
 `ai-core` is the **primary**. It names `ai-mock` and `hello-ai` in `bundle.members`. All three share `@jpulse-net/plugin-ai-core`. The bump-version file list lives only here. Companions have no `webapp/bump-version.conf`, and their `package.json` is a publish guard only — staging strips it from the packaged copy.
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.14**, W-245, 2026-09-20: Prompt and response debug dumps use `logDebug` and need both the plugin `debugDumps` setting and the host `aiCore` debug area. The panel remembers the last-open thread per user. Requires jPulse Framework >= 2.0.8. `ai-mock` and `hello-ai` lockstep.
 - **1.0.13**, W-241, 2026-09-19: Cancel (button or `/cancel`) returns Send after a successful POST, even when no `canceled` event arrives. Double-click the toolbar to restore the default size and corner (`resetOnTitleDblclick: false` opts out). Site Configuration tab is **AI Agent**. The conversation picker omits an archived conversation with no surviving turns.
 - **1.0.12**, W-239, 2026-09-19: `/sources` footer names how many sources are used of the maximum, then the image count. The source cap does not include images. A listed PNG is not missing from the count.
 - **1.0.11**, W-238, 2026-09-19: Blocked chip Attach uses `jp-tooltip`, not `title`. Enabling Attach (or a new reason) unbinds that tooltip. A conversation switch confirm says Switch, not New conversation. Compose Enter does not bubble to the host page. The AI WebSocket pattern registers on the host `WebSocketController`, so a `plugins/ai-core` symlink still serves `/api/1/ws/ai/:threadId`.

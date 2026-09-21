@@ -3,8 +3,8 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.13
- * @release         2026-09-19
+ * @version         1.0.14
+ * @release         2026-09-20
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -97,6 +97,14 @@ function logLine(req, method, message, actor) {
     const logger = global.LogController;
     if (logger?.logInfo) {
         logger.logInfo(req, method, `${message}${suffix}`);
+    }
+}
+
+function logDebug(req, method, message, actor) {
+    const suffix = onBehalfOfLogSuffix(actor);
+    const logger = global.LogController;
+    if (logger?.logDebug) {
+        logger.logDebug(req, method, `${message}${suffix}`);
     }
 }
 
@@ -285,8 +293,8 @@ export async function runTurn(params) {
                 hookManager,
                 ...extras.prompt
             });
-            if (settings.debugDumps) {
-                logLine(req, 'aiCore.runTurn', formatPromptDebugLine(
+            if (settings.debugDumps && global.LogController?.debugEnabled?.('aiCore')) {
+                logDebug(req, 'aiCore.runTurn', formatPromptDebugLine(
                     String(turn._id),
                     resolved.tools,
                     prompt.system,
@@ -385,8 +393,8 @@ export async function runTurn(params) {
                 status = 'canceled';
                 break;
             }
-            if (settings.debugDumps) {
-                logLine(req, 'aiCore.runTurn', formatResponseDebugLine({
+            if (settings.debugDumps && global.LogController?.debugEnabled?.('aiCore')) {
+                logDebug(req, 'aiCore.runTurn', formatResponseDebugLine({
                     turnId: String(turn._id),
                     round,
                     stopReason,

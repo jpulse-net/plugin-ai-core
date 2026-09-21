@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.13
- * @release         2026-09-19
+ * @version         1.0.14
+ * @release         2026-09-20
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -474,7 +474,7 @@ describe('1.0.10 chip attach, shell, destroy cancel', () => {
         expect(css).not.toMatch(/\.jp-float-panel[^{]*\{[^}]*overflow/);
     });
 
-    test('bundle requires jPulse >=2.0.5', () => {
+    test('bundle requires jPulse >=2.0.8', () => {
         const core = fs.readFileSync(
             path.resolve(process.cwd(), 'plugins/ai-core/plugin.json'),
             'utf8'
@@ -487,9 +487,9 @@ describe('1.0.10 chip attach, shell, destroy cancel', () => {
             path.resolve(process.cwd(), 'plugins/hello-ai/plugin.json'),
             'utf8'
         );
-        expect(core).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
-        expect(mock).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
-        expect(hello).toMatch(/"jpulseVersion":\s*">=2\.0\.5"/);
+        expect(core).toMatch(/"jpulseVersion":\s*">=2\.0\.8"/);
+        expect(mock).toMatch(/"jpulseVersion":\s*">=2\.0\.8"/);
+        expect(hello).toMatch(/"jpulseVersion":\s*">=2\.0\.8"/);
     });
 });
 
