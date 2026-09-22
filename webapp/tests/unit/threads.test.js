@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Threads
  * @tagline         One active thread per scope and user
  * @file            plugins/ai-core/webapp/tests/unit/threads.test.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -271,6 +271,118 @@ describe('threads', () => {
         expect(visible.some((row) => String(row._id) === String(husk._id))).toBe(false);
         expect(visible.some((row) => String(row._id) === String(active._id))).toBe(true);
         expect(visible.some((row) => String(row._id) === String(kept._id))).toBe(true);
+    });
+
+    test('deleteById removes the row and returns it', async () => {
+        const collection = memoryCollection();
+        AiThreadModel.useCollection(collection);
+        const thread = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-del',
+            createdBy: 'jdoe',
+            label: 'Gone'
+        });
+        const deleted = await AiThreadModel.deleteById(thread._id);
+        expect(deleted.label).toBe('Gone');
+        expect(await AiThreadModel.findById(thread._id)).toBeNull();
+        expect(await AiThreadModel.deleteById(thread._id)).toBeNull();
+    });
+
+    test('deleting the active thread leaves exactly one active', async () => {
+        const collection = memoryCollection();
+        AiThreadModel.useCollection(collection);
+        const older = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-swap',
+            createdBy: 'jdoe',
+            now: new Date('2026-01-01T00:00:00Z'),
+            label: 'Older'
+        });
+        await AiThreadModel._update(older._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-01-01T00:00:00Z')
+        });
+        const newer = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-swap',
+            createdBy: 'jdoe',
+            now: new Date('2026-02-01T00:00:00Z'),
+            label: 'Newer archive'
+        });
+        await AiThreadModel._update(newer._id, {
+            status: 'archived',
+            updatedAt: new Date('2026-02-01T00:00:00Z')
+        });
+        const active = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-swap',
+            createdBy: 'jdoe',
+            now: new Date('2026-03-01T00:00:00Z'),
+            label: 'Active'
+        });
+        await AiThreadModel.deleteById(active._id);
+        const remaining = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-swap'
+        });
+        const next = remaining[0]
+            ? await AiThreadModel.activate(remaining[0]._id)
+            : await AiThreadModel.findOrCreateActive({
+                scopeType: 'doc',
+                scopeId: 'doc-swap',
+                createdBy: 'jdoe'
+            });
+        expect(next.status).toBe('active');
+        expect(String(next._id)).toBe(String(newer._id));
+        const actives = remaining.map((row) => (
+            String(row._id) === String(next._id) ? next : row
+        )).filter((row) => row.status === 'active');
+        expect(actives).toHaveLength(1);
+        const last = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-last',
+            createdBy: 'jdoe'
+        });
+        await AiThreadModel.deleteById(last._id);
+        const created = await AiThreadModel.findOrCreateActive({
+            scopeType: 'doc',
+            scopeId: 'doc-last',
+            createdBy: 'jdoe'
+        });
+        expect(created.status).toBe('active');
+        expect(String(created._id)).not.toBe(String(last._id));
+        const lastList = await AiThreadModel.listForOwner({
+            createdBy: 'jdoe',
+            scopeType: 'doc',
+            scopeId: 'doc-last'
+        });
+        expect(lastList.filter((row) => row.status === 'active')).toHaveLength(1);
+    });
+
+    test('survivingByThreadIds reports a gap and a husk', async () => {
+        const turns = memoryCollection();
+        AiTurnModel.useCollection(turns);
+        await AiTurnModel.create({
+            threadId: 'partial',
+            seq: 4,
+            userText: 'kept',
+            createdBy: 'jdoe'
+        });
+        await AiTurnModel.create({
+            threadId: 'partial',
+            seq: 5,
+            userText: 'also kept',
+            createdBy: 'jdoe'
+        });
+        const stats = await AiTurnModel.survivingByThreadIds(['partial', 'husk', '']);
+        expect(stats).toEqual([
+            { threadId: 'partial', surviving: 2, minSeq: 4 },
+            { threadId: 'husk', surviving: 0, minSeq: 0 }
+        ]);
+        expect(stats[0].minSeq).toBeGreaterThan(1);
+        const empty = await AiTurnModel.survivingByThreadIds([]);
+        expect(empty).toEqual([]);
     });
 });
 

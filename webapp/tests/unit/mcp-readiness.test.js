@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / MCP Readiness
  * @tagline         Tools layer with a synthetic non-web actor
  * @file            plugins/ai-core/webapp/tests/unit/mcp-readiness.test.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

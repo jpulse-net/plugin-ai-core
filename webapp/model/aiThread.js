@@ -3,8 +3,8 @@
  * @tagline         Conversation threads
  * @description     One active thread per (scopeType, scopeId, createdBy); find-or-create lives here
  * @file            plugins/ai-core/webapp/model/aiThread.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -156,6 +156,20 @@ class AiThreadModel {
 
     static async archive(id) {
         return this._update(id, { status: 'archived', updatedAt: new Date() });
+    }
+
+    static async activate(id) {
+        return this._update(id, { status: 'active', updatedAt: new Date() });
+    }
+
+    static async deleteById(id) {
+        const collection = this.getCollection();
+        const existing = await collection.findOne({ _id: coerceId(id) });
+        if (!existing) {
+            return null;
+        }
+        await collection.deleteMany({ _id: coerceId(id) });
+        return existing;
     }
 
     static async setProviderModel(id, provider, model) {

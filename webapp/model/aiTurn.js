@@ -3,8 +3,8 @@
  * @tagline         Turn records
  * @description     One user message and everything the agent did in response
  * @file            plugins/ai-core/webapp/model/aiTurn.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -148,19 +148,47 @@ class AiTurnModel {
     }
 
     /**
+     * Surviving turn counts and the first remaining seq per thread.
+     * Grouped in JS so the unit-test memory collection does not need $group.
+     * Empty input is a no-query empty array. Ids with no turns return surviving 0.
+     * @param {Array<string|object>} ids
+     * @returns {Promise<Array<{threadId: string, surviving: number, minSeq: number}>>}
+     */
+    static async survivingByThreadIds(ids) {
+        const list = (Array.isArray(ids) ? ids : []).map((id) => String(id)).filter(Boolean);
+        if (!list.length) {
+            return [];
+        }
+        const rows = await this.getCollection()
+            .find({ threadId: { $in: list } }, { projection: { threadId: 1, seq: 1 } })
+            .toArray();
+        const byId = new Map();
+        rows.forEach((row) => {
+            const threadId = String(row.threadId);
+            const seq = Number(row.seq) || 0;
+            const current = byId.get(threadId);
+            if (!current) {
+                byId.set(threadId, { threadId, surviving: 1, minSeq: seq });
+                return;
+            }
+            current.surviving += 1;
+            if (seq < current.minSeq) {
+                current.minSeq = seq;
+            }
+        });
+        return list.map((threadId) => {
+            return byId.get(threadId) || { threadId, surviving: 0, minSeq: 0 };
+        });
+    }
+
+    /**
      * Thread ids that still have at least one turn. Empty input is a no-query empty set.
      * @param {Array<string|object>} ids
      * @returns {Promise<Set<string>>}
      */
     static async threadIdsWithTurns(ids) {
-        const list = (Array.isArray(ids) ? ids : []).map((id) => String(id)).filter(Boolean);
-        if (!list.length) {
-            return new Set();
-        }
-        const rows = await this.getCollection()
-            .find({ threadId: { $in: list } }, { projection: { threadId: 1 } })
-            .toArray();
-        return new Set(rows.map((row) => String(row.threadId)));
+        const stats = await this.survivingByThreadIds(ids);
+        return new Set(stats.filter((row) => row.surviving > 0).map((row) => row.threadId));
     }
 
     static async _update(id, fields) {

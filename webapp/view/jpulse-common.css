@@ -3,8 +3,8 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -44,7 +44,7 @@
 .plg-ai-thread-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     padding: 8px 10px;
     border-bottom: 1px solid var(--jp-theme-border-color);
     flex-shrink: 0;
@@ -64,12 +64,19 @@
 
 .plg-ai-thread-row .jp-btn {
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+    margin: 0;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+.plg-ai-purge {
+    padding: 6px 0;
+    font-size: 0.85em;
+    color: var(--jp-theme-text-secondary);
 }
 
 .plg-ai-notice {
@@ -414,6 +421,7 @@
 }
 
 .plg-ai-chip-pop-copy {
+    margin: 0;
     padding: 0 6px;
     min-height: 0;
     line-height: 1.2;
@@ -428,6 +436,7 @@
 .plg-ai-strip-add .jp-btn {
     width: 28px;
     height: 28px;
+    margin: 0;
     padding: 0;
     display: inline-flex;
     align-items: center;

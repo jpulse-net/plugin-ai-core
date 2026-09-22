@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -255,7 +255,7 @@ describe('slash catalog', () => {
     test('slash picker matches the typed prefix and ignores literals', () => {
         const catalog = normalizeCatalog();
         expect(filterSlashCommands('/', catalog, {}).map((row) => row.name)).toEqual([
-            'help', 'tools', 'model', 'new', 'cancel', 'conversations', 'status'
+            'help', 'tools', 'model', 'new', 'cancel', 'delete', 'conversations', 'status'
         ]);
         expect(filterSlashCommands('/he', catalog, {}).map((row) => row.name)).toEqual(['help']);
         expect(filterSlashCommands('/model ai-mock/mock-echo', catalog, {}).map((row) => row.name)).toEqual(['model']);

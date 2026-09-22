@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Panel Strip
  * @tagline         Chip lifetime, mailbox delete routes, and send-time strip contracts
  * @file            plugins/ai-core/webapp/tests/unit/panel-strip.test.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -140,7 +140,7 @@ describe('prior strip regressions stay closed', () => {
 
     test('compose Enter stops before send.click', () => {
         expect(panel).toMatch(
-            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
+            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*if \(event\.isComposing \|\| event\.keyCode === 229\) \{\s*return;\s*\}\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
         );
     });
 
@@ -222,13 +222,13 @@ describe('prior strip regressions stay closed', () => {
             'utf8'
         );
         const start = src.indexOf('static async apiListThreads');
-        const body = src.slice(start, start + 1400);
+        const body = src.slice(start, start + 2400);
         expect(body).toMatch(/limit: 100/);
-        expect(body).toMatch(/threadIdsWithTurns/);
+        expect(body).toMatch(/survivingByThreadIds/);
         expect(body).toMatch(/row\.status !== 'archived'/);
         expect(body).toMatch(/visible\.slice/);
-        expect(body.indexOf('threadIdsWithTurns')).toBeLessThan(body.indexOf('visible.slice'));
-        expect(body.indexOf('limit: 100')).toBeLessThan(body.indexOf('threadIdsWithTurns'));
+        expect(body.indexOf('survivingByThreadIds')).toBeLessThan(body.indexOf('visible.slice'));
+        expect(body.indexOf('limit: 100')).toBeLessThan(body.indexOf('survivingByThreadIds'));
     });
 
     test('source ✕ does not delete the image mailbox', () => {

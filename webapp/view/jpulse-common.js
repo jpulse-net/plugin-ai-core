@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -24,6 +24,12 @@ if (!window.jPulse) {
         newConfirmBody: '{{i18n.view.ui.ai.panel.newConfirmBody}}',
         switchConfirmTitle: '{{i18n.view.ui.ai.panel.switchConfirmTitle}}',
         switchConfirmAction: '{{i18n.view.ui.ai.panel.switchConfirmAction}}',
+        deleteConversation: '{{i18n.view.ui.ai.panel.deleteConversation}}',
+        deleteConfirmTitle: '{{i18n.view.ui.ai.panel.deleteConfirmTitle}}',
+        deleteConfirmBody: '{{i18n.view.ui.ai.panel.deleteConfirmBody}}',
+        deleteConfirmSources: '{{i18n.view.ui.ai.panel.deleteConfirmSources}}',
+        deleteAction: '{{i18n.view.ui.ai.panel.deleteAction}}',
+        purged: '{{i18n.view.ui.ai.panel.purged}}',
         rename: '{{i18n.view.ui.ai.panel.rename}}',
         send: '{{i18n.view.ui.ai.panel.send}}',
         cancel: '{{i18n.view.ui.ai.panel.cancel}}',
@@ -52,6 +58,9 @@ if (!window.jPulse) {
         slashModel: '{{i18n.view.ui.ai.slash.model}}',
         slashNew: '{{i18n.view.ui.ai.slash.new}}',
         slashCancel: '{{i18n.view.ui.ai.slash.cancel}}',
+        slashDelete: '{{i18n.view.ui.ai.slash.delete}}',
+        slashDeleteEmpty: '{{i18n.view.ui.ai.slash.deleteEmpty}}',
+        slashDeleteDone: '{{i18n.view.ui.ai.slash.deleteDone}}',
         slashConversations: '{{i18n.view.ui.ai.slash.conversations}}',
         slashQuota: '{{i18n.view.ui.ai.slash.quota}}',
         slashSources: '{{i18n.view.ui.ai.slash.sources}}',
@@ -188,6 +197,7 @@ if (!window.jPulse) {
         { name: 'model' },
         { name: 'new', aliases: ['clear'] },
         { name: 'cancel' },
+        { name: 'delete' },
         { name: 'conversations', aliases: ['resume'] },
         { name: 'quota', when: whenQuota },
         { name: 'sources', when: whenSources },
@@ -810,11 +820,14 @@ if (!window.jPulse) {
             '<div class="plg-ai-thread-row">',
             `  <select class="plg-ai-thread-select jp-form-select" aria-label="${escapeHtml(title)}"></select>`,
             `  <input type="text" class="plg-ai-thread-edit jp-form-input" hidden aria-label="${escapeHtml(I18N.rename)}">`,
-            `  <button type="button" class="plg-ai-rename jp-btn jp-btn-sm" title="${escapeHtml(I18N.rename)}" aria-label="${escapeHtml(I18N.rename)}">`,
+            `  <button type="button" class="plg-ai-rename jp-btn jp-btn-sm jp-btn-outline" title="${escapeHtml(I18N.rename)}" aria-label="${escapeHtml(I18N.rename)}">`,
             '    <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.6 1.6a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7l-8.2 8.2L3 14l1.4-3.2 8.2-8.2z"/></svg>',
             '  </button>',
-            `  <button type="button" class="plg-ai-new jp-btn jp-btn-sm" title="${escapeHtml(I18N.newConversation)}" aria-label="${escapeHtml(I18N.newConversation)}">`,
+            `  <button type="button" class="plg-ai-new jp-btn jp-btn-sm jp-btn-outline" title="${escapeHtml(I18N.newConversation)}" aria-label="${escapeHtml(I18N.newConversation)}">`,
             '    <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M8 3v10M3 8h10"/></svg>',
+            '  </button>',
+            `  <button type="button" class="plg-ai-delete jp-btn jp-btn-sm jp-btn-outline" title="${escapeHtml(I18N.deleteConversation)}" aria-label="${escapeHtml(I18N.deleteConversation)}">`,
+            '    <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M3.5 4h9M6 4V3h4v1M5 4.5l.6 8.5h4.8l.6-8.5"/></svg>',
             '  </button>',
             '</div>',
             '<div class="plg-ai-anchor" data-anchor="header"></div>',
@@ -830,7 +843,7 @@ if (!window.jPulse) {
             '  <div class="plg-ai-strip" hidden>',
             '    <div class="plg-ai-strip-chips"></div>',
             '    <div class="plg-ai-strip-add">',
-            `      <button type="button" class="plg-ai-add jp-btn jp-btn-sm jp-tooltip" data-tooltip="${escapeHtml(I18N.stripLifetime)}" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(I18N.stripAttach)}">`,
+            `      <button type="button" class="plg-ai-add jp-btn jp-btn-sm jp-btn-outline jp-tooltip" data-tooltip="${escapeHtml(I18N.stripLifetime)}" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(I18N.stripAttach)}">`,
             '        <svg class="plg-ai-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M8 3v10M3 8h10"/></svg>',
             '      </button>',
             '      <div class="plg-ai-add-menu" hidden role="menu">',
@@ -942,7 +955,8 @@ if (!window.jPulse) {
             threadSelect: root.querySelector('.plg-ai-thread-select'),
             threadEdit: root.querySelector('.plg-ai-thread-edit'),
             rename: root.querySelector('.plg-ai-rename'),
-            newer: root.querySelector('.plg-ai-new')
+            newer: root.querySelector('.plg-ai-new'),
+            trash: root.querySelector('.plg-ai-delete')
         };
 
         if (els.add && jPulse.UI && jPulse.UI.tooltip && typeof jPulse.UI.tooltip.init === 'function') {
@@ -990,6 +1004,7 @@ if (!window.jPulse) {
                 model: I18N.slashModel,
                 new: I18N.slashNew,
                 cancel: I18N.slashCancel,
+                delete: I18N.slashDelete,
                 conversations: I18N.slashConversations,
                 quota: I18N.slashQuota,
                 sources: I18N.slashSources,
@@ -1156,6 +1171,63 @@ if (!window.jPulse) {
             els.cancel.hidden = !running;
             els.send.hidden = running;
             els.send.disabled = running;
+            updateDeleteButton();
+        }
+
+        function conversationIsEmpty() {
+            if (state.turns.length) {
+                return false;
+            }
+            const thread = currentThread();
+            if (thread && Object.prototype.hasOwnProperty.call(thread, 'surviving')) {
+                return Number(thread.surviving) === 0;
+            }
+            return true;
+        }
+
+        function conversationMinSeq() {
+            const thread = currentThread();
+            const listed = thread ? Number(thread.minSeq) || 0 : 0;
+            if (listed > 1) {
+                return listed;
+            }
+            if (!state.turns.length) {
+                return listed;
+            }
+            return Number(state.turns[0].seq) || 0;
+        }
+
+        function updateDeleteButton() {
+            if (!els.trash) {
+                return;
+            }
+            els.trash.hidden = !state.threadId || state.running || conversationIsEmpty();
+        }
+
+        let retentionTold = false;
+
+        function applyRetentionNotice() {
+            const days = state.capability && state.capability.retentionDays;
+            if (state.running) {
+                return;
+            }
+            if (els.notice.textContent === I18N.reconnecting) {
+                return;
+            }
+            showNotice('', false);
+            if (!days || conversationMinSeq() > 1 || retentionTold) {
+                return;
+            }
+            retentionTold = true;
+            showToast(fillToken(I18N.retention, '%DAYS%', String(days)), 'info');
+        }
+
+        function purgeNoticeHtml() {
+            const days = state.capability && state.capability.retentionDays;
+            if (!days || conversationMinSeq() <= 1) {
+                return '';
+            }
+            return `<article class="plg-ai-turn plg-ai-turn--notice"><div class="plg-ai-purge">${escapeHtml(fillToken(I18N.purged, '%DAYS%', String(days)))}</div></article>`;
         }
 
         function syncStore() {
@@ -1273,7 +1345,7 @@ if (!window.jPulse) {
                 return '';
             }
             const copy = copyable
-                ? `<button type="button" class="plg-ai-chip-pop-copy jp-btn jp-btn-sm" data-copy="${escapeHtml(text)}">${escapeHtml(I18N.copy)}</button>`
+                ? `<button type="button" class="plg-ai-chip-pop-copy jp-btn jp-btn-sm jp-btn-outline" data-copy="${escapeHtml(text)}">${escapeHtml(I18N.copy)}</button>`
                 : '';
             return `<div class="plg-ai-chip-pop-row"><span class="plg-ai-chip-pop-label">${escapeHtml(label)}</span>`
                 + `<span class="plg-ai-chip-pop-value">${escapeHtml(text)}</span>${copy}</div>`;
@@ -1755,6 +1827,24 @@ if (!window.jPulse) {
             });
         }
 
+        async function confirmDeleteThread() {
+            const thread = currentThread();
+            const title = (thread && thread.label) || I18N.unnamed;
+            let message = fillToken(I18N.deleteConfirmBody, '%TITLE%', title);
+            if (attachmentCount() > 0) {
+                message += `\n\n${I18N.deleteConfirmSources}`;
+            }
+            if (jPulse.UI && typeof jPulse.UI.confirmDialog === 'function') {
+                const result = await jPulse.UI.confirmDialog({
+                    title: I18N.deleteConfirmTitle,
+                    message: message,
+                    buttons: [I18N.cancel, I18N.deleteAction]
+                });
+                return !!(result && result.confirmed);
+            }
+            return window.confirm(message);
+        }
+
         function sourceRefsBadge(turn) {
             const refs = (turn && turn.sourceRefs) || [];
             if (!refs.length) {
@@ -1792,6 +1882,7 @@ if (!window.jPulse) {
             if (!state.threads.length) {
                 els.threadSelect.innerHTML = `<option value="">${escapeHtml(I18N.empty)}</option>`;
                 els.threadSelect.disabled = true;
+                updateDeleteButton();
                 return;
             }
             els.threadSelect.disabled = false;
@@ -1800,6 +1891,7 @@ if (!window.jPulse) {
                 const selected = id === state.threadId ? ' selected' : '';
                 return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(threadOptionLabel(thread))}</option>`;
             }).join('');
+            updateDeleteButton();
         }
 
         function currentThread() {
@@ -1860,6 +1952,16 @@ if (!window.jPulse) {
             return { ok: true };
         }
 
+        function cardCanUndo(card) {
+            if (!card || !card.applied || card.undone || state.running || !scopeCanWrite()) {
+                return false;
+            }
+            if (typeof adapter.canUndoProposal === 'function') {
+                return !!adapter.canUndoProposal(card);
+            }
+            return typeof adapter.undoProposal === 'function';
+        }
+
         function renderCardHtml(turn, card) {
             const applyState = cardApplyState(card);
             const status = card.error
@@ -1874,7 +1976,7 @@ if (!window.jPulse) {
                                 ? escapeHtml(I18N.cardReadOnly)
                                 : '';
             const applyHidden = applyState.ok ? '' : ' hidden';
-            const undoHidden = card.applied && !card.undone && !state.running && scopeCanWrite() ? '' : ' hidden';
+            const undoHidden = cardCanUndo(card) ? '' : ' hidden';
             return [
                 `<section class="plg-ai-card" data-ai-card data-proposal-id="${escapeHtml(card.id)}" data-turn-id="${escapeHtml(String(turn._id))}">`,
                 `  <div class="plg-ai-card-kind">${escapeHtml(card.kind || '')}</div>`,
@@ -2015,7 +2117,8 @@ if (!window.jPulse) {
                 }
                 html.push('</article>');
             }
-            els.messages.innerHTML = html.join('');
+            const purge = purgeNoticeHtml();
+            els.messages.innerHTML = purge + html.join('');
             state.locals.forEach((local, idx) => {
                 const box = els.messages.querySelector(`[data-ai-local="${idx}"]`);
                 if (!box) {
@@ -2041,6 +2144,7 @@ if (!window.jPulse) {
             applyThreadModel(null);
             await renderTurns();
             renderThreads();
+            updateDeleteButton();
             loadThreadContext();
             emitRegionEvent('thread');
         }
@@ -2078,7 +2182,11 @@ if (!window.jPulse) {
             applyThreadModel(currentThread());
             const running = state.turns.some((turn) => turn.status === 'running');
             setRunning(running);
-            showNotice(running ? I18N.running : '', running);
+            if (running) {
+                showNotice(I18N.running, true);
+            } else {
+                applyRetentionNotice();
+            }
             if (state.capability && state.capability.transport === 'ws') {
                 await transport.connectWs(state.threadId);
             }
@@ -2087,6 +2195,7 @@ if (!window.jPulse) {
             }
             await renderTurns();
             renderThreads();
+            updateDeleteButton();
             loadThreadContext();
             emitRegionEvent('thread');
         }
@@ -2408,6 +2517,44 @@ if (!window.jPulse) {
             return I18N.cancel;
         }
 
+        async function runDelete() {
+            if (state.running) {
+                return I18N.cardRunning;
+            }
+            if (!state.threadId || conversationIsEmpty()) {
+                return I18N.slashDeleteEmpty;
+            }
+            if (!(await confirmDeleteThread())) {
+                return false;
+            }
+            await deleteOpenThread();
+            return false;
+        }
+
+        async function deleteOpenThread() {
+            const deletedId = state.threadId;
+            const res = await jPulse.api.delete(`/api/1/ai/thread/${encodeURIComponent(deletedId)}`);
+            if (!res.success) {
+                showToast(res.error || I18N.error, 'error');
+                return;
+            }
+            if (threadKey && localStorage.getItem(threadKey) === deletedId) {
+                localStorage.removeItem(threadKey);
+            }
+            await clearAttachments();
+            await refreshThreads();
+            const next = res.data && res.data.thread;
+            if (next && next._id) {
+                await openThread(String(next._id));
+                return;
+            }
+            if (state.threads[0]) {
+                await openThread(String(state.threads[0]._id));
+                return;
+            }
+            await showEmptyThread();
+        }
+
         const FRAMEWORK_RUNNERS = {
             help: slashHelpNode,
             tools: toolsText,
@@ -2420,6 +2567,7 @@ if (!window.jPulse) {
                 return I18N.newConversation;
             },
             cancel: runCancel,
+            delete: runDelete,
             conversations: runConversations,
             quota: runQuota,
             sources: runSources,
@@ -2621,7 +2769,7 @@ if (!window.jPulse) {
                 }
                 showNotice('', false);
                 emitRegionEvent('turn');
-                openThread(state.threadId, { keepLocals: true });
+                refreshThreads().then(() => openThread(state.threadId, { keepLocals: true }));
             }
         });
 
@@ -2664,7 +2812,7 @@ if (!window.jPulse) {
         }
 
         async function runUndo(turn, proposal) {
-            if (!turn || !proposal || !proposal.applied || proposal.undone) {
+            if (!turn || !proposal || !cardCanUndo(proposal)) {
                 return false;
             }
             state.cardBusy[proposal.id] = true;
@@ -2783,6 +2931,9 @@ if (!window.jPulse) {
                 return;
             }
             if (event.key === 'Enter' && !event.shiftKey) {
+                if (event.isComposing || event.keyCode === 229) {
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 els.send.click();
@@ -3333,6 +3484,17 @@ if (!window.jPulse) {
             await createNew();
         });
         els.rename.addEventListener('click', startRename);
+        if (els.trash) {
+            els.trash.addEventListener('click', async () => {
+                if (state.running || !state.threadId || conversationIsEmpty()) {
+                    return;
+                }
+                if (!(await confirmDeleteThread())) {
+                    return;
+                }
+                await deleteOpenThread();
+            });
+        }
         els.threadSelect.addEventListener('change', async () => {
             const id = els.threadSelect.value;
             if (!id) {
@@ -3369,9 +3531,6 @@ if (!window.jPulse) {
                 state.capability = capability;
                 threadKey = threadStorageKey(capability && capability.username, scopeType, scopeId);
                 applyThreadModel(currentThread());
-                if (capability.retentionDays) {
-                    showNotice(fillToken(I18N.retention, '%DAYS%', String(capability.retentionDays)), true);
-                }
                 await refreshThreads();
                 const userStored = localStorage.getItem(threadKey) || '';
                 const legacyStored = localStorage.getItem(legacyThreadKey) || '';

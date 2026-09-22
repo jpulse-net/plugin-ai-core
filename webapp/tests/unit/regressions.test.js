@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -549,11 +549,12 @@ describe('1.0.11 chip tooltip, switch confirm, compose Enter', () => {
 
     test('compose Enter stops before send.click', () => {
         expect(panel).toMatch(
-            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
+            /if \(event\.key === 'Enter' && !event\.shiftKey\) \{\s*if \(event\.isComposing \|\| event\.keyCode === 229\) \{\s*return;\s*\}\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*els\.send\.click\(\);/
         );
         const start = panel.indexOf("if (event.key === 'Enter' && !event.shiftKey)");
         expect(start).toBeGreaterThan(-1);
-        const body = panel.slice(start, start + 180);
+        const body = panel.slice(start, start + 280);
+        expect(body.indexOf('isComposing')).toBeGreaterThan(-1);
         expect(body.indexOf('stopPropagation')).toBeGreaterThan(-1);
         expect(body.indexOf('stopPropagation')).toBeLessThan(body.indexOf('els.send.click'));
     });
@@ -601,12 +602,83 @@ describe('1.0.13 cancel unsticks, toolbar reset, tab label, empty archives', () 
             'utf8'
         );
         const start = src.indexOf('static async apiListThreads');
-        const body = src.slice(start, start + 1400);
+        const body = src.slice(start, start + 2400);
         expect(body).toMatch(/limit: 100/);
-        expect(body).toMatch(/threadIdsWithTurns/);
+        expect(body).toMatch(/survivingByThreadIds/);
         expect(body).toMatch(/visible\.slice/);
-        expect(body.indexOf('limit: 100')).toBeLessThan(body.indexOf('threadIdsWithTurns'));
-        expect(body.indexOf('threadIdsWithTurns')).toBeLessThan(body.indexOf('visible.slice'));
+        expect(body.indexOf('limit: 100')).toBeLessThan(body.indexOf('survivingByThreadIds'));
+        expect(body.indexOf('survivingByThreadIds')).toBeLessThan(body.indexOf('visible.slice'));
+    });
+});
+
+describe('1.0.15 delete conversation and purge line', () => {
+    test('delete route exists and goes through _ownedThread', () => {
+        const src = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/controller/aiCore.js'),
+            'utf8'
+        );
+        expect(src).toMatch(
+            /method: 'DELETE', path: '\/api\/1\/ai\/thread\/:id', handler: 'apiDeleteThread'/
+        );
+        const start = src.indexOf('static async apiDeleteThread');
+        expect(start).toBeGreaterThan(-1);
+        const body = src.slice(start, start + 3200);
+        expect(body).toMatch(/this\._ownedThread/);
+        expect(body).toMatch(/deleteByThreadIds/);
+        expect(body).toMatch(/deleteStagedThread/);
+        expect(body).toMatch(/deleteById/);
+        expect(body).toMatch(/deleted: true/);
+        expect(body.indexOf('_ownedThread')).toBeLessThan(body.indexOf('deleteById'));
+    });
+
+    test('confirm is confirmDialog and not the /new title', () => {
+        expect(panel).toMatch(/async function confirmDeleteThread/);
+        const body = fnBody('confirmDeleteThread');
+        expect(body).toMatch(/jPulse\.UI\.confirmDialog/);
+        expect(body).toMatch(/I18N\.deleteConfirmTitle/);
+        expect(body).toMatch(/I18N\.deleteConfirmBody/);
+        expect(body).toMatch(/I18N\.deleteAction/);
+        expect(body).toMatch(/I18N\.deleteConfirmSources/);
+        expect(body).not.toMatch(/I18N\.newConfirmTitle/);
+        expect(body).not.toMatch(/Start a new conversation\?/);
+        expect(enConf).toMatch(/deleteConfirmTitle:\s*'Delete conversation\?'/);
+        expect(enConf).not.toMatch(/deleteConfirmTitle:\s*'Start a new conversation\?'/);
+        expect(deConf).toMatch(/deleteConfirmTitle:\s*'Gespräch löschen\?'/);
+    });
+
+    test('/delete is in both catalogs and empty does not DELETE', () => {
+        const slash = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/utils/panel/slash.js'),
+            'utf8'
+        );
+        expect(slash).toMatch(/\{ name: 'delete' \}/);
+        expect(panel).toMatch(/\{ name: 'delete' \}/);
+        expect(panel).toMatch(/delete: I18N\.slashDelete/);
+        expect(panel).toMatch(/delete: runDelete/);
+        const run = fnBody('runDelete');
+        expect(run).toMatch(/I18N\.slashDeleteEmpty/);
+        expect(run).toMatch(/confirmDeleteThread/);
+        expect(run.indexOf('slashDeleteEmpty')).toBeLessThan(run.indexOf('confirmDeleteThread'));
+        expect(run.indexOf('slashDeleteEmpty')).toBeLessThan(run.indexOf('deleteOpenThread'));
+        expect(run).toMatch(/await deleteOpenThread\(\);\s*return false;/);
+        expect(run).not.toMatch(/return I18N\.slashDeleteDone/);
+        const del = fnBody('deleteOpenThread');
+        expect(del).toMatch(/jPulse\.api\.delete/);
+        expect(del).toMatch(/\/api\/1\/ai\/thread\//);
+        expect(panel).toMatch(/els\.trash\.hidden = !state\.threadId \|\| state\.running \|\| conversationIsEmpty\(\)/);
+        const empty = fnBody('conversationIsEmpty');
+        expect(empty).toMatch(/state\.turns\.length/);
+        expect(empty.indexOf('state.turns.length')).toBeLessThan(empty.indexOf('surviving'));
+        expect(panel).toMatch(/event\.isComposing \|\| event\.keyCode === 229/);
+        expect(panel).toMatch(/refreshThreads\(\)\.then\(\(\) => openThread\(state\.threadId, \{ keepLocals: true \}\)/);
+        expect(panel).toMatch(/function cardCanUndo/);
+        expect(panel).toMatch(/adapter\.canUndoProposal/);
+        expect(panel).toMatch(/plg-ai-delete jp-btn jp-btn-sm jp-btn-outline/);
+        const retention = fnBody('applyRetentionNotice');
+        expect(retention).toMatch(/showToast/);
+        expect(retention).toMatch(/'info'/);
+        expect(retention).toMatch(/retentionTold/);
+        expect(retention).not.toMatch(/showNotice\(fillToken\(I18N\.retention/);
     });
 });
 

@@ -3,8 +3,8 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.14
- * @release         2026-09-20
+ * @version         1.0.15
+ * @release         2026-09-21
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -244,6 +244,7 @@ class AiCoreController {
         { method: 'GET', path: '/api/1/ai/thread', handler: 'apiListThreads', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread/:id', handler: 'apiGetThread', auth: 'user' },
         { method: 'PUT', path: '/api/1/ai/thread/:id', handler: 'apiRenameThread', auth: 'user' },
+        { method: 'DELETE', path: '/api/1/ai/thread/:id', handler: 'apiDeleteThread', auth: 'user' },
         { method: 'PUT', path: '/api/1/ai/thread/:id/archive', handler: 'apiArchiveThread', auth: 'user' },
         { method: 'GET', path: '/api/1/ai/thread/:id/turns', handler: 'apiListTurns', auth: 'user' },
         { method: 'POST', path: '/api/1/ai/thread/:id/turn', handler: 'apiStartTurn', auth: 'user' },
@@ -708,12 +709,23 @@ class AiCoreController {
                 status: req.query.status,
                 limit: 100
             });
-            const withTurns = await AiTurnModel.threadIdsWithTurns(
+            const stats = await AiTurnModel.survivingByThreadIds(
                 threads.map((row) => row && row._id)
             );
-            const visible = threads.filter((row) => (
-                !row || row.status !== 'archived' || withTurns.has(String(row._id))
-            ));
+            const byId = new Map(stats.map((row) => [row.threadId, row]));
+            const visible = threads.filter((row) => {
+                if (!row) {
+                    return false;
+                }
+                const info = byId.get(String(row._id)) || { surviving: 0, minSeq: 0 };
+                return row.status !== 'archived' || info.surviving > 0;
+            }).map((row) => {
+                const info = byId.get(String(row._id)) || { surviving: 0, minSeq: 0 };
+                return Object.assign({}, row, {
+                    surviving: info.surviving,
+                    minSeq: info.minSeq
+                });
+            });
             const listed = hasLimit
                 ? visible.slice(0, Math.min(Math.floor(requested), 100))
                 : visible;
@@ -822,6 +834,69 @@ class AiCoreController {
         } catch (error) {
             logErr(req, 'aiCore.apiArchiveThread', actorFromRequest(req), error);
             return sendError(req, res, 500, 'Failed to archive thread', 'AI_THREAD_ARCHIVE_FAILED');
+        }
+    }
+
+    static async apiDeleteThread(req, res) {
+        try {
+            const gated = await this._gate(req, res);
+            if (!gated) {
+                return;
+            }
+            const { actor } = gated;
+            logReq(req, 'aiCore.apiDeleteThread', actor);
+            const thread = await this._ownedThread(req, actor, req.params.id);
+            if (thread == null) {
+                return sendError(req, res, 404, 'Thread not found', 'AI_THREAD_NOT_FOUND');
+            }
+            if (thread === false) {
+                return sendError(req, res, 403, 'Not your thread', 'AI_THREAD_FORBIDDEN');
+            }
+            const wasActive = thread.status === 'active';
+            const owner = threadOwner(actor);
+            const scopeType = thread.scopeType;
+            const scopeId = thread.scopeId;
+            await AiTurnModel.deleteByThreadIds([thread._id]);
+            await deleteStagedThread(owner, String(thread._id));
+            await AiThreadModel.deleteById(thread._id);
+            let next = null;
+            if (wasActive) {
+                const remaining = await AiThreadModel.listForOwner({
+                    createdBy: owner,
+                    scopeType,
+                    scopeId,
+                    limit: 100
+                });
+                next = remaining[0]
+                    ? await AiThreadModel.activate(remaining[0]._id)
+                    : await AiThreadModel.findOrCreateActive({
+                        scopeType,
+                        scopeId,
+                        createdBy: owner,
+                        provider: thread.provider,
+                        model: thread.model
+                    });
+            } else {
+                const active = await AiThreadModel.listForOwner({
+                    createdBy: owner,
+                    scopeType,
+                    scopeId,
+                    status: 'active',
+                    limit: 1
+                });
+                next = active[0] || await AiThreadModel.findOrCreateActive({
+                    scopeType,
+                    scopeId,
+                    createdBy: owner,
+                    provider: thread.provider,
+                    model: thread.model
+                });
+            }
+            res.json({ success: true, data: { deleted: true, thread: next } });
+            logOk(req, 'aiCore.apiDeleteThread', actor, String(thread._id));
+        } catch (error) {
+            logErr(req, 'aiCore.apiDeleteThread', actorFromRequest(req), error);
+            return sendError(req, res, 500, 'Failed to delete thread', 'AI_THREAD_DELETE_FAILED');
         }
     }
 
