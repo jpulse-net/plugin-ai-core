@@ -869,6 +869,8 @@ if (!window.jPulse) {
             document.body.appendChild(root);
         }
         let pinMessages = function () {};
+        let retentionReady = false;
+        let retentionTold = false;
         const resetRect = {
             w: 420,
             h: 560,
@@ -890,8 +892,9 @@ if (!window.jPulse) {
             cascade: options.cascade,
             group: options.group,
             mobile: options.mobile,
-            onOpen: function () {
+            onOpen: function (panelHandle) {
                 pinMessages();
+                applyRetentionNotice(panelHandle);
             }
         });
         const launcherEl = typeof options.launcher === 'string'
@@ -1204,9 +1207,36 @@ if (!window.jPulse) {
             els.trash.hidden = !state.threadId || state.running || conversationIsEmpty();
         }
 
-        let retentionTold = false;
+        function panelIsOpen(panelHandle) {
+            const current = panelHandle || handle;
+            return !!(current && typeof current.isOpen === 'function' && current.isOpen());
+        }
 
-        function applyRetentionNotice() {
+        function retentionSessionKey() {
+            const user = (state.capability && state.capability.username) || '_anon';
+            return `jp:ai:retentionTold:${user}`;
+        }
+
+        function sessionRetentionTold() {
+            try {
+                return sessionStorage.getItem(retentionSessionKey()) === '1';
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function markSessionRetentionTold() {
+            try {
+                sessionStorage.setItem(retentionSessionKey(), '1');
+            } catch (error) {
+                /* ignore quota / private-mode */
+            }
+        }
+
+        function applyRetentionNotice(panelHandle) {
+            if (!retentionReady || !panelIsOpen(panelHandle)) {
+                return;
+            }
             const days = state.capability && state.capability.retentionDays;
             if (state.running) {
                 return;
@@ -1215,10 +1245,14 @@ if (!window.jPulse) {
                 return;
             }
             showNotice('', false);
-            if (!days || conversationMinSeq() > 1 || retentionTold) {
+            if (!days || conversationMinSeq() > 1 || retentionTold || sessionRetentionTold()) {
+                if (sessionRetentionTold()) {
+                    retentionTold = true;
+                }
                 return;
             }
             retentionTold = true;
+            markSessionRetentionTold();
             showToast(fillToken(I18N.retention, '%DAYS%', String(days)), 'info');
         }
 
@@ -2687,6 +2721,7 @@ if (!window.jPulse) {
         }
 
         async function sendText(text, script) {
+            applyRetentionNotice();
             els.slash.hidden = true;
             const threadId = await ensureThread();
             setRunning(true);
@@ -3543,6 +3578,7 @@ if (!window.jPulse) {
                     loadThreadContext();
                 }
                 refreshRegions();
+                retentionReady = true;
             } catch (error) {
                 showToast(error.message || I18N.loadError, 'error');
             }

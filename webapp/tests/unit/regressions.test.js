@@ -678,7 +678,14 @@ describe('1.0.15 delete conversation and purge line', () => {
         expect(retention).toMatch(/showToast/);
         expect(retention).toMatch(/'info'/);
         expect(retention).toMatch(/retentionTold/);
+        expect(retention).toMatch(/retentionReady/);
+        expect(retention).toMatch(/panelIsOpen/);
+        expect(retention).toMatch(/sessionRetentionTold/);
+        expect(panel).toMatch(/sessionStorage\.getItem\(retentionSessionKey\(\)\)/);
+        expect(retention.indexOf('retentionReady')).toBeLessThan(retention.indexOf('showToast'));
         expect(retention).not.toMatch(/showNotice\(fillToken\(I18N\.retention/);
+        expect(panel).toMatch(/retentionReady = true/);
+        expect(panel).toMatch(/onOpen: function \(panelHandle\) \{\s*pinMessages\(\);\s*applyRetentionNotice\(panelHandle\);/);
     });
 });
 
