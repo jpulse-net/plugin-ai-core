@@ -2723,52 +2723,57 @@ if (!window.jPulse) {
         async function sendText(text, script) {
             applyRetentionNotice();
             els.slash.hidden = true;
-            const threadId = await ensureThread();
-            setRunning(true);
-            state.streaming = '';
-            state.pendingUser = text;
-            showNotice('', false);
-            await renderTurns();
-            const body = { text: text };
-            if (state.sources.length) {
-                body.sources = state.sources.map(sourceMeta);
-            }
-            if (state.images.length) {
-                const chosen = ((state.capability && state.capability.models) || []).find((row) => {
-                    return row.provider === (state.selectedProvider || (state.capability.defaultModel && state.capability.defaultModel.provider))
-                        && row.model === (state.selectedModel || (state.capability.defaultModel && state.capability.defaultModel.model));
-                });
-                if (chosen && chosen.available === false && chosen.reason === 'vision') {
-                    showToast(I18N.visionGated, 'warning');
-                    setRunning(false);
-                    state.pendingUser = '';
-                    state.streaming = '';
-                    await renderTurns();
-                    return;
-                }
-                body.images = state.images.map(imageMeta);
-            }
-            if (state.selectedProvider && state.selectedModel) {
-                body.provider = state.selectedProvider;
-                body.model = state.selectedModel;
-            }
-            if (typeof adapter.describeContext === 'function') {
-                body.context = adapter.describeContext(hasContextOptions() ? contextGet() : undefined);
-            } else if (hasContextOptions()) {
-                const selected = readContextOptions().find((row) => row.value === contextGet());
-                body.context = selected ? selected.label : contextGet();
-            }
-            if (typeof adapter.describeTarget === 'function') {
-                body.target = adapter.describeTarget();
-            }
-            if (script) {
-                body.script = script;
-            }
             try {
+                const threadId = await ensureThread();
+                setRunning(true);
+                state.streaming = '';
+                state.pendingUser = text;
+                showNotice('', false);
+                await renderTurns();
+                const body = { text: text };
+                if (state.sources.length) {
+                    body.sources = state.sources.map(sourceMeta);
+                }
+                if (state.images.length) {
+                    const chosen = ((state.capability && state.capability.models) || []).find((row) => {
+                        return row.provider === (state.selectedProvider || (state.capability.defaultModel && state.capability.defaultModel.provider))
+                            && row.model === (state.selectedModel || (state.capability.defaultModel && state.capability.defaultModel.model));
+                    });
+                    if (chosen && chosen.available === false && chosen.reason === 'vision') {
+                        showToast(I18N.visionGated, 'warning');
+                        setRunning(false);
+                        state.pendingUser = '';
+                        state.streaming = '';
+                        await renderTurns();
+                        return;
+                    }
+                    body.images = state.images.map(imageMeta);
+                }
+                if (state.selectedProvider && state.selectedModel) {
+                    body.provider = state.selectedProvider;
+                    body.model = state.selectedModel;
+                }
+                if (typeof adapter.describeContext === 'function') {
+                    body.context = adapter.describeContext(hasContextOptions() ? contextGet() : undefined);
+                } else if (hasContextOptions()) {
+                    const selected = readContextOptions().find((row) => row.value === contextGet());
+                    body.context = selected ? selected.label : contextGet();
+                }
+                if (typeof adapter.describeTarget === 'function') {
+                    body.target = adapter.describeTarget();
+                }
+                if (script) {
+                    body.script = script;
+                }
                 await transport.startTurn(threadId, body);
             } catch (error) {
                 setRunning(false);
+                state.pendingUser = '';
+                state.streaming = '';
                 showToast(error.message || I18N.error, 'error');
+                if (!String(els.input.value || '').trim()) {
+                    els.input.value = text;
+                }
                 await renderTurns();
             }
         }

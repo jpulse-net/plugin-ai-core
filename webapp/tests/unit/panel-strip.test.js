@@ -50,6 +50,11 @@ describe('panel strip lifetime', () => {
         expect(body).not.toMatch(/clearAttachments\(\)/);
     });
 
+    test('sendText toasts when the thread cannot be created', () => {
+        const body = fnBody('sendText');
+        expect(body).toMatch(/try\s*\{[\s\S]*await ensureThread\(\)[\s\S]*\}\s*catch\s*\(error\)\s*\{[\s\S]*showToast\(error\.message/);
+    });
+
     test('clearAttachments wipes both families and deletes the thread mailbox', () => {
         const body = fnBody('clearAttachments');
         expect(body).toMatch(/state\.sources = \[\]/);
