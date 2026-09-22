@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.15
+# jPulse Framework / Plugins / AI Core Plugin v1.0.16
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.16**, W-248, 2026-09-22: Hello AI adds Code Examples and Architecture beside the scratch pad. No ai-core product change. `ai-mock` lockstep.
 - **1.0.15**, W-247, 2026-09-21: The Trash button or `/delete` removes the open conversation after a confirm, then binds the newest remaining conversation or a new empty one. A partially purged transcript shows that older messages were removed after N days. The keep-for-N-days policy is shown as an info toast. `ai-mock` and `hello-ai` lockstep.
 - **1.0.14**, W-245, 2026-09-20: Prompt and response debug dumps use `logDebug` and need both the plugin `debugDumps` setting and the host `aiCore` debug area. The panel remembers the last-open thread per user. Requires jPulse Framework >= 2.0.8. `ai-mock` and `hello-ai` lockstep.
 - **1.0.13**, W-241, 2026-09-19: Cancel (button or `/cancel`) returns Send after a successful POST, even when no `canceled` event arrives. Double-click the toolbar to restore the default size and corner (`resetOnTitleDblclick: false` opts out). Site Configuration tab is **AI Agent**. The conversation picker omits an archived conversation with no surviving turns.

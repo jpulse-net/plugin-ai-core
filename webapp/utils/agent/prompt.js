@@ -3,8 +3,8 @@
  * @tagline         System prompt assembly
  * @description     Framework owns order; the site owns the words
  * @file            plugins/ai-core/webapp/utils/agent/prompt.js
- * @version         1.0.15
- * @release         2026-09-21
+ * @version         1.0.16
+ * @release         2026-09-22
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
