@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / WS Bridge
  * @tagline         Namespace authorization and client-host mapping
  * @file            plugins/ai-core/webapp/tests/unit/ws-bridge.test.js
- * @version         1.0.16
- * @release         2026-09-22
+ * @version         1.0.17
+ * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -269,6 +269,74 @@ describe('registerAiNamespace host controller', () => {
         expect(src).not.toMatch(/from\s+['"](?:\.\.\/){5}webapp\/controller\/websocket\.js['"]/);
         expect(src).toMatch(/global\.WebSocketController/);
         expect(src).toMatch(/projectRoot/);
+    });
+
+    test('does not repeat an error the turn loop already sent', async () => {
+        const sent = [];
+        let onMessage = null;
+        const live = {
+            createNamespace() {
+                return {
+                    onMessage(fn) {
+                        onMessage = fn;
+                        return this;
+                    },
+                    onDisconnect() { return this; }
+                };
+            },
+            broadcast(_nsPath, event) {
+                sent.push(event);
+            },
+            sendToClient() {}
+        };
+        const prev = global.WebSocketController;
+        global.WebSocketController = live;
+        const conn = {
+            message: { type: 'turn', data: { text: 'hi' } },
+            clientId: 'c1',
+            ctx: {
+                threadId: 't1',
+                username: 'jdoe',
+                roles: ['user'],
+                user: { username: 'jdoe', roles: ['user'] },
+                createdBy: 'jdoe',
+                scopeType: 'doc',
+                scopeId: 'd1'
+            }
+        };
+        const depsFor = (runTurn) => ({
+            loadSettings: async () => settings(),
+            threadModel: threadModel({
+                _id: 't1',
+                createdBy: 'jdoe',
+                scopeType: 'doc',
+                scopeId: 'd1'
+            }),
+            runTurn
+        });
+        try {
+            await registerAiNamespace(depsFor(async () => {
+                const error = new Error('Rate limit exceeded');
+                error.code = 'AI_RATE_LIMIT';
+                error.emitted = true;
+                throw error;
+            }));
+            await onMessage(conn);
+            expect(sent.filter((event) => event.type === 'error')).toEqual([]);
+
+            sent.length = 0;
+            await registerAiNamespace(depsFor(async () => {
+                const error = new Error('socket died');
+                error.code = 'AI_PROVIDER_ERROR';
+                throw error;
+            }));
+            await onMessage(conn);
+            expect(sent.filter((event) => event.type === 'error')).toEqual([
+                { type: 'error', code: 'AI_PROVIDER_ERROR', message: 'socket died' }
+            ]);
+        } finally {
+            global.WebSocketController = prev;
+        }
     });
 
     test('stamps the pattern on global.WebSocketController', async () => {

@@ -3,8 +3,8 @@
  * @tagline         Readability-lite HTML to markdown
  * @description     No DOM library; empty-shell verdict for client-rendered pages
  * @file            plugins/ai-core/webapp/utils/attachments/html.js
- * @version         1.0.16
- * @release         2026-09-22
+ * @version         1.0.17
+ * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

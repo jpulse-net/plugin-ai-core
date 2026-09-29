@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.16
- * @release         2026-09-22
+ * @version         1.0.17
+ * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -13,7 +13,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { attachTurnAbort, requestCancel } from '../../utils/agent/cancel.js';
-import { acquireLease, clearLocalLeases, onAiQuotaCheck, onAiQuotaSettle, runTurn } from '../../utils/agent/index.js';
+import { acquireLease, clearLocalLeases, formatRetryLog, onAiQuotaCheck, onAiQuotaSettle, RETRYABLE_WAIT_MS, retryWaitMs, runTurn } from '../../utils/agent/index.js';
 import AiThreadModel from '../../model/aiThread.js';
 import AiTurnModel from '../../model/aiTurn.js';
 import AiUsageModel from '../../model/aiUsage.js';
@@ -126,20 +126,104 @@ describe('turn loop', () => {
 
     test('retryable provider error then success', async () => {
         const thread = await seedThread();
-        const result = await runTurn({
-            actor: testActor(),
-            thread,
-            userText: '[mock:retry] recovered',
-            settings,
-            hookManager: hooksWith(),
-            threadModel: AiThreadModel,
-            turnModel: AiTurnModel,
-            usageModel: AiUsageModel,
-            redisManager: { isRedisAvailable: () => false },
-            sleep: async () => {}
-        });
-        expect(result.status).toBe('completed');
-        expect(result.turn.agentText).toMatch(/recovered/);
+        const errors = [];
+        const infos = [];
+        const prevLogger = global.LogController;
+        global.LogController = {
+            logInfo: (_req, _method, message) => infos.push(message),
+            logError: () => {},
+            logDebug: () => {}
+        };
+        try {
+            const result = await runTurn({
+                actor: testActor(),
+                thread,
+                userText: '[mock:retry] recovered',
+                settings,
+                hookManager: hooksWith(),
+                threadModel: AiThreadModel,
+                turnModel: AiTurnModel,
+                usageModel: AiUsageModel,
+                redisManager: { isRedisAvailable: () => false },
+                sleep: async () => {},
+                sink: (event) => {
+                    if (event.type === 'error') {
+                        errors.push(event);
+                    }
+                }
+            });
+            expect(result.status).toBe('completed');
+            expect(result.turn.agentText).toMatch(/recovered/);
+        } finally {
+            global.LogController = prevLogger;
+        }
+        expect(errors).toHaveLength(0);
+        expect(infos.filter(message => message.startsWith('retry:'))).toEqual([
+            formatRetryLog(0, 'AI_MOCK_RETRY', 'Mock retryable error')
+        ]);
+    });
+
+    test('retryable provider error reaches the client only after retries are exhausted', async () => {
+        const thread = await seedThread();
+        const errors = [];
+        const infos = [];
+        const waits = [];
+        const headerMs = 30000;
+        const prevLogger = global.LogController;
+        global.LogController = {
+            logInfo: (_req, _method, message) => infos.push(message),
+            logError: () => {},
+            logDebug: () => {}
+        };
+        let thrown = null;
+        try {
+            await runTurn({
+                actor: testActor(),
+                thread,
+                userText: 'keep failing',
+                settings,
+                hookManager: hooksWith({
+                    'onAiComplete:ai-mock': (ctx) => {
+                        const event = {
+                            type: 'error',
+                            code: 'AI_RATE_LIMIT',
+                            message: 'high demand',
+                            retryable: true
+                        };
+                        if ((ctx.attempt || 0) === 0) {
+                            event.retryAfterMs = headerMs;
+                        }
+                        ctx.emit(event);
+                    }
+                }),
+                threadModel: AiThreadModel,
+                turnModel: AiTurnModel,
+                usageModel: AiUsageModel,
+                redisManager: { isRedisAvailable: () => false },
+                sleep: async (ms) => { waits.push(ms); },
+                sink: (event) => {
+                    if (event.type === 'error') {
+                        errors.push(event);
+                    }
+                }
+            });
+        } catch (error) {
+            thrown = error;
+        } finally {
+            global.LogController = prevLogger;
+        }
+        expect(thrown && thrown.message).toMatch(/high demand/);
+        expect(thrown.emitted).toBe(true);
+        expect(errors).toEqual([
+            { type: 'error', code: 'AI_RATE_LIMIT', message: 'high demand', retryable: true }
+        ]);
+        expect(waits).toEqual(RETRYABLE_WAIT_MS.map((_slot, index) => {
+            return retryWaitMs(index, index === 0 ? headerMs : 0);
+        }));
+        expect(waits[0]).toBe(RETRYABLE_WAIT_MS[0]);
+        expect(infos.filter(message => message.startsWith('retry:'))).toEqual(RETRYABLE_WAIT_MS.map((_slot, index) => {
+            return formatRetryLog(index, 'AI_RATE_LIMIT', 'high demand', index === 0 ? headerMs : undefined);
+        }));
     });
 
     test('fatal provider error', async () => {

@@ -3,8 +3,8 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.16
- * @release         2026-09-22
+ * @version         1.0.17
+ * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -26,10 +26,26 @@ import {
     priceForModel
 } from './providers.js';
 
-const RETRYABLE_WAIT_MS = [500, 1500, 3500];
+export const RETRYABLE_WAIT_MS = [2000, 4000, 10000];
+const RETRY_AFTER_CAP_MS = 30000;
 const DEBUG_PRIOR_MAX = 1500;
 const DEBUG_TEXT_MAX = 400;
 const AUTO_TITLE_MAX = 60;
+
+export function retryWaitMs(attempt, retryAfterMs) {
+    const scheduled = RETRYABLE_WAIT_MS[attempt] || 0;
+    const hinted = Number(retryAfterMs);
+    if (!Number.isFinite(hinted) || hinted <= 0) {
+        return scheduled;
+    }
+    return Math.min(scheduled, hinted, RETRY_AFTER_CAP_MS);
+}
+
+export function formatRetryLog(attempt, code, message, retryAfterMs) {
+    const waitMs = retryWaitMs(attempt, retryAfterMs);
+    const total = RETRYABLE_WAIT_MS.length + 1;
+    return `retry: ${code || 'AI_PROVIDER_ERROR'} attempt ${attempt + 1} of ${total}: ${message || 'provider error'} (wait ${waitMs}ms)`;
+}
 
 function sleep(ms, sleeper, abortSignal) {
     if (typeof sleeper === 'function') {
@@ -182,6 +198,7 @@ export async function runTurn(params) {
     } catch (error) {
         logError(req, 'aiCore.runTurn', `error: quota ${error.message}`, actor);
         sink({ type: 'error', code: error.code || 'AI_QUOTA_FAILED', message: error.message });
+        error.emitted = true;
         throw error;
     }
 
@@ -201,6 +218,7 @@ export async function runTurn(params) {
         const error = new Error('A turn is already running on this thread');
         error.code = 'AI_LEASE_HELD';
         sink({ type: 'error', code: error.code, message: error.message });
+        error.emitted = true;
         throw error;
     }
 
@@ -308,12 +326,25 @@ export async function runTurn(params) {
             let toolUse = null;
             let stopReason = 'end';
             let providerError = null;
+            let attempts = 0;
             const emit = (event) => {
                 if (!event || typeof event !== 'object') {
                     return;
                 }
-                sink(event);
-                roundEvents.push(event);
+                const retryLater = event.type === 'error'
+                    && event.retryable
+                    && attempts < RETRYABLE_WAIT_MS.length;
+                if (retryLater) {
+                    logLine(
+                        req,
+                        'aiCore.runTurn',
+                        formatRetryLog(attempts, event.code, event.message, event.retryAfterMs),
+                        actor
+                    );
+                } else {
+                    sink(event);
+                    roundEvents.push(event);
+                }
                 if (event.type === 'text_delta' && event.text) {
                     agentText += event.text;
                 }
@@ -328,11 +359,12 @@ export async function runTurn(params) {
                 }
                 if (event.type === 'error') {
                     providerError = event;
-                    emittedError = true;
+                    if (!retryLater) {
+                        emittedError = true;
+                    }
                 }
             };
 
-            let attempts = 0;
             while (true) {
                 providerError = null;
                 toolUse = null;
@@ -364,7 +396,7 @@ export async function runTurn(params) {
                     chosen.model = completeCtx.model;
                 }
                 if (providerError && providerError.retryable && attempts < RETRYABLE_WAIT_MS.length) {
-                    await sleep(RETRYABLE_WAIT_MS[attempts], params.sleep, params.abortSignal);
+                    await sleep(retryWaitMs(attempts, providerError.retryAfterMs), params.sleep, params.abortSignal);
                     if (turnStopped(String(thread._id), params.abortSignal)) {
                         break;
                     }
@@ -558,6 +590,7 @@ export async function runTurn(params) {
         if (!emittedError) {
             sink({ type: 'error', code: error.code || 'AI_TURN_FAILED', message: error.message });
         }
+        error.emitted = true;
         logError(req, 'aiCore.runTurn', `error: ${error.message}`, actor);
         throw error;
     } finally {

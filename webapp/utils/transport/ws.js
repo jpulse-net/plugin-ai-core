@@ -3,8 +3,8 @@
  * @tagline         Per-thread AI namespace and client-host bridge
  * @description     Authorize the handshake, start turns on the socket, call the origin tab
  * @file            plugins/ai-core/webapp/utils/transport/ws.js
- * @version         1.0.16
- * @release         2026-09-22
+ * @version         1.0.17
+ * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -219,6 +219,7 @@ export async function registerAiNamespace(deps = {}) {
         const nsPath = namespacePath(threadId);
         origins.set(nsPath, conn.clientId);
         const settings = await (deps.loadSettings || loadSettings)();
+        const turnRunner = deps.runTurn || runTurn;
         const threadModel = deps.threadModel || AiThreadModel;
         const thread = await threadModel.findById(threadId);
         if (!thread || thread.createdBy !== threadOwner(actor)) {
@@ -227,7 +228,7 @@ export async function registerAiNamespace(deps = {}) {
         const data = message.data || {};
         const sink = (event) => emitTurnEvent(WS, ns, nsPath, conn.clientId, event);
         try {
-            await runTurn({
+            await turnRunner({
                 actor,
                 thread,
                 threadId: thread._id,
@@ -253,6 +254,9 @@ export async function registerAiNamespace(deps = {}) {
                 })
             });
         } catch (error) {
+            if (error && error.emitted) {
+                return;
+            }
             sink({
                 type: 'error',
                 code: error.code || 'AI_TURN_FAILED',
