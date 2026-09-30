@@ -3,12 +3,17 @@
     "version": "1.0.18",
     "type": "module",
     "description": "jPulse AI agent bundle: ai-core, the ai-mock provider, and the hello-ai sample",
-    "keywords": ["jpulse", "jpulse-plugin", "ai", "agent"],
+    "keywords": [
+        "jpulse",
+        "jpulse-plugin",
+        "ai",
+        "agent"
+    ],
     "author": "jPulse Team <team@jpulse.net>",
     "license": "BSL-1.1",
     "repository": {
         "type": "git",
-        "url": "https://github.com/jpulse-net/plugin-ai-core.git"
+        "url": "git+https://github.com/jpulse-net/plugin-ai-core.git"
     },
     "publishConfig": {
         "registry": "https://npm.pkg.github.com",
