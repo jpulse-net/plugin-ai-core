@@ -3,7 +3,7 @@
  * @tagline         Collect a streaming request body
  * @description     StreamBody.pipe into a capped in-memory buffer
  * @file            plugins/ai-core/webapp/utils/attachments/stream.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

@@ -3,7 +3,7 @@
  * @tagline         plg-ai chat classes over jp-float-panel
  * @description     Appended to the framework jpulse-common.css (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.css
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -555,6 +555,59 @@
 
 .plg-ai-help-gap {
     height: 0.7em;
+}
+
+.plg-ai-help-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.plg-ai-help-item {
+    margin: 0;
+    padding-left: 1em;
+    text-indent: -1em;
+    line-height: 1.35;
+}
+
+.plg-ai-help-item--marked {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35em;
+    padding-left: 0;
+    text-indent: 0;
+}
+
+.plg-ai-help-item .plg-ai-help-example {
+    text-indent: 0;
+}
+
+.plg-ai-help-marker {
+    flex: 0 0 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.35em;
+    color: var(--jp-theme-text-secondary);
+}
+
+.plg-ai-help-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.plg-ai-model-icon {
+    color: var(--jp-theme-text-primary);
+}
+
+.plg-ai-model-icon svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+}
+
+.plg-ai-help-item--off .plg-ai-model-icon {
+    opacity: 0.45;
 }
 
 .plg-ai-help-examples-label {

@@ -3,7 +3,7 @@
  * @tagline         Conversation threads
  * @description     One active thread per (scopeType, scopeId, createdBy); find-or-create lives here
  * @file            plugins/ai-core/webapp/model/aiThread.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

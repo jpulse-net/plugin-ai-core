@@ -3,7 +3,7 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -25,25 +25,38 @@ import {
     listProviders,
     priceForModel
 } from './providers.js';
+import { DEFAULT_RETRY_AFTER_CAP_MS, DEFAULT_RETRY_WAIT_MS } from './settings.js';
 
-export const RETRYABLE_WAIT_MS = [2000, 4000, 10000];
-const RETRY_AFTER_CAP_MS = 30000;
+export const RETRYABLE_WAIT_MS = DEFAULT_RETRY_WAIT_MS;
 const DEBUG_PRIOR_MAX = 1500;
 const DEBUG_TEXT_MAX = 400;
 const AUTO_TITLE_MAX = 60;
 
-export function retryWaitMs(attempt, retryAfterMs) {
-    const scheduled = RETRYABLE_WAIT_MS[attempt] || 0;
+/**
+ * @param {{ waits?: number[], capMs?: number }} [retry] - from settings
+ *     `retryWaitMs` / `retryAfterCapMs`; missing values use the defaults
+ * @returns {{ waits: number[], capMs: number }}
+ */
+function retryPolicy(retry = {}) {
+    return {
+        waits: Array.isArray(retry.waits) ? retry.waits : RETRYABLE_WAIT_MS,
+        capMs: Number.isFinite(retry.capMs) && retry.capMs > 0 ? retry.capMs : DEFAULT_RETRY_AFTER_CAP_MS
+    };
+}
+
+export function retryWaitMs(attempt, retryAfterMs, retry) {
+    const policy = retryPolicy(retry);
+    const scheduled = policy.waits[attempt] || 0;
     const hinted = Number(retryAfterMs);
     if (!Number.isFinite(hinted) || hinted <= 0) {
         return scheduled;
     }
-    return Math.min(scheduled, hinted, RETRY_AFTER_CAP_MS);
+    return Math.min(scheduled, hinted, policy.capMs);
 }
 
-export function formatRetryLog(attempt, code, message, retryAfterMs) {
-    const waitMs = retryWaitMs(attempt, retryAfterMs);
-    const total = RETRYABLE_WAIT_MS.length + 1;
+export function formatRetryLog(attempt, code, message, retryAfterMs, retry) {
+    const waitMs = retryWaitMs(attempt, retryAfterMs, retry);
+    const total = retryPolicy(retry).waits.length + 1;
     return `retry: ${code || 'AI_PROVIDER_ERROR'} attempt ${attempt + 1} of ${total}: ${message || 'provider error'} (wait ${waitMs}ms)`;
 }
 
@@ -162,6 +175,7 @@ export async function runTurn(params) {
     const holderId = params.holderId || `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const timeoutMs = settings.turnTimeoutMs || 120000;
     const maxRounds = settings.maxRoundsPerTurn || 8;
+    const retry = retryPolicy({ waits: settings.retryWaitMs, capMs: settings.retryAfterCapMs });
     const startedAt = Date.now();
 
     let thread = params.thread || await threadModel.findById(params.threadId);
@@ -333,12 +347,12 @@ export async function runTurn(params) {
                 }
                 const retryLater = event.type === 'error'
                     && event.retryable
-                    && attempts < RETRYABLE_WAIT_MS.length;
+                    && attempts < retry.waits.length;
                 if (retryLater) {
                     logLine(
                         req,
                         'aiCore.runTurn',
-                        formatRetryLog(attempts, event.code, event.message, event.retryAfterMs),
+                        formatRetryLog(attempts, event.code, event.message, event.retryAfterMs, retry),
                         actor
                     );
                 } else {
@@ -395,8 +409,8 @@ export async function runTurn(params) {
                 if (completeCtx.model && completeCtx.model !== chosen.model) {
                     chosen.model = completeCtx.model;
                 }
-                if (providerError && providerError.retryable && attempts < RETRYABLE_WAIT_MS.length) {
-                    await sleep(retryWaitMs(attempts, providerError.retryAfterMs), params.sleep, params.abortSignal);
+                if (providerError && providerError.retryable && attempts < retry.waits.length) {
+                    await sleep(retryWaitMs(attempts, providerError.retryAfterMs, retry), params.sleep, params.abortSignal);
                     if (turnStopped(String(thread._id), params.abortSignal)) {
                         break;
                     }

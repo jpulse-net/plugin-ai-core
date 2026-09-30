@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.17
+# jPulse Framework / Plugins / AI Core Plugin v1.0.18
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -82,6 +82,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.
 - **1.0.17**, W-252, 2026-09-30: A retryable provider error is logged and not shown until the last attempt fails. A success after a retry shows no error. The WebSocket handler does not send that error a second time. Waits are 2s, 4s, and 10s; a Retry-After header can only shorten a wait. `ai-mock` and `hello-ai` lockstep.
 - **1.0.16**, W-248, 2026-09-22: Hello AI adds Code Examples and Architecture beside the scratch pad. No ai-core product change. `ai-mock` lockstep.
 - **1.0.15**, W-247, 2026-09-21: The Trash button or `/delete` removes the open conversation after a confirm, then binds the newest remaining conversation or a new empty one. A partially purged transcript shows that older messages were removed after N days. The keep-for-N-days policy is shown as an info toast. `ai-mock` and `hello-ai` lockstep.

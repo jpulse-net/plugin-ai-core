@@ -3,7 +3,7 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -24,6 +24,7 @@ import {
     onAiQuotaSettle,
     pairOnMenu,
     pickDefaultModel,
+    providerMap,
     queryHasImages,
     quotaSnapshot,
     roleAllowed,
@@ -318,6 +319,18 @@ class AiCoreController {
                         default: 120000,
                         label: '{{i18n.view.ui.ai.config.turnTimeoutMs}}'
                     },
+                    retryWaitMs: {
+                        type: 'string',
+                        default: AI_CONFIG_DEFAULTS.retryWaitMs.join(', '),
+                        label: '{{i18n.view.ui.ai.config.retryWaitMs}}',
+                        help: '{{i18n.view.ui.ai.config.retryWaitMsHelp}}'
+                    },
+                    retryAfterCapMs: {
+                        type: 'number',
+                        default: AI_CONFIG_DEFAULTS.retryAfterCapMs,
+                        label: '{{i18n.view.ui.ai.config.retryAfterCapMs}}',
+                        help: '{{i18n.view.ui.ai.config.retryAfterCapMsHelp}}'
+                    },
                     defaultToolTimeoutMs: {
                         type: 'number',
                         default: 10000,
@@ -607,6 +620,7 @@ class AiCoreController {
                     withheld: resolved.withheld,
                     modules: listModuleManifest(),
                     models: menu,
+                    providers: providerMap(menu, providers),
                     defaultModel: pickDefaultModel(menu, settings),
                     quota,
                     retentionDays: settings.retentionDays,

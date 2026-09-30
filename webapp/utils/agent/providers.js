@@ -3,7 +3,7 @@
  * @tagline         Provider registry and capability map
  * @description     capabilities is a map; unknown keys read false
  * @file            plugins/ai-core/webapp/utils/agent/providers.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -156,6 +156,53 @@ export function gateModelsForVision(menu, { hasImages } = {}) {
         }
         return { ...row, available: false, reason: 'vision' };
     });
+}
+
+/**
+ * A plugin.json icon is used only when it is a plain inline SVG: it is
+ * inserted with innerHTML on the client.
+ * @param {*} value
+ * @returns {string} the trimmed SVG, or '' when not acceptable
+ */
+export function safeSvgIcon(value) {
+    const svg = typeof value === 'string' ? value.trim() : '';
+    if (!/^<svg[\s>]/i.test(svg) || !/<\/svg>$/i.test(svg)) {
+        return '';
+    }
+    if (/<script|<foreignObject|\son[a-z]+\s*=|javascript:/i.test(svg)) {
+        return '';
+    }
+    return svg;
+}
+
+function pluginIcon(pluginManager, name) {
+    try {
+        return safeSvgIcon(pluginManager?.getPlugin?.(name)?.metadata?.icon);
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * One entry per provider on the menu: `{ [plugin]: { label, icon } }`.
+ * The icon comes from the provider plugin's plugin.json; a missing or
+ * unsafe icon falls back to the ai-core icon.
+ */
+export function providerMap(menu, providers, pluginManager = global.PluginManager) {
+    const fallback = pluginIcon(pluginManager, 'ai-core');
+    const byPlugin = new Map((providers || []).map(p => [p.plugin, p]));
+    const map = {};
+    for (const row of menu || []) {
+        if (!row?.provider || map[row.provider]) {
+            continue;
+        }
+        const provider = byPlugin.get(row.provider);
+        map[row.provider] = {
+            label: provider?.label || row.provider,
+            icon: pluginIcon(pluginManager, row.provider) || fallback
+        };
+    }
+    return map;
 }
 
 export function queryHasImages(query) {

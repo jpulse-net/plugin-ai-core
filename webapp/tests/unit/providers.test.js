@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Providers
  * @tagline         configured filter, pair choice, vision gate
  * @file            plugins/ai-core/webapp/tests/unit/providers.test.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -20,7 +20,9 @@ import {
     normalizeProvider,
     pairOnMenu,
     pickDefaultModel,
-    queryHasImages
+    providerMap,
+    queryHasImages,
+    safeSvgIcon
 } from '../../utils/agent/providers.js';
 
 const mock = {
@@ -195,6 +197,67 @@ describe('ai-mock descriptor', () => {
         const seen = menu.find((row) => row.model === 'mock-vision');
         expect(echo.capabilities.vision).toBe(false);
         expect(seen.capabilities.vision).toBe(true);
+    });
+});
+
+describe('safeSvgIcon', () => {
+    test('accepts a plain inline SVG and trims it', () => {
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18"/></svg>';
+        expect(safeSvgIcon(`  ${svg}\n`)).toBe(svg);
+    });
+
+    test('rejects non-SVG, scripts, event handlers, and javascript: URLs', () => {
+        expect(safeSvgIcon('')).toBe('');
+        expect(safeSvgIcon(null)).toBe('');
+        expect(safeSvgIcon('<img src="x.png">')).toBe('');
+        expect(safeSvgIcon('<svgfoo></svgfoo>')).toBe('');
+        expect(safeSvgIcon('<svg><script>alert(1)</script></svg>')).toBe('');
+        expect(safeSvgIcon('<svg onload="alert(1)"></svg>')).toBe('');
+        expect(safeSvgIcon('<svg><a href="javascript:alert(1)"></a></svg>')).toBe('');
+        expect(safeSvgIcon('<svg><foreignObject></foreignObject></svg>')).toBe('');
+    });
+});
+
+describe('providerMap', () => {
+    const coreIcon = '<svg viewBox="0 0 24 24"><rect width="16" height="12"/></svg>';
+    const claudeIcon = '<svg viewBox="0 0 24 24"><path d="M5 20 12 4"/></svg>';
+    const pluginManager = {
+        getPlugin(name) {
+            const icons = {
+                'ai-core': coreIcon,
+                'ai-anthropic': claudeIcon,
+                'ai-mock': '<svg onload="x()"></svg>'
+            };
+            return name in icons ? { metadata: { icon: icons[name] } } : null;
+        }
+    };
+
+    test('one entry per provider, icon from its plugin.json', () => {
+        const menu = [
+            { provider: 'ai-anthropic', model: 'claude-sonnet-5' },
+            { provider: 'ai-anthropic', model: 'claude-opus-5' }
+        ];
+        expect(providerMap(menu, [claude], pluginManager)).toEqual({
+            'ai-anthropic': { label: 'Anthropic', icon: claudeIcon }
+        });
+    });
+
+    test('an unsafe or missing icon falls back to the ai-core icon', () => {
+        const menu = [
+            { provider: 'ai-mock', model: 'mock-echo' },
+            { provider: 'ai-other', model: 'x' }
+        ];
+        expect(providerMap(menu, [mock], pluginManager)).toEqual({
+            'ai-mock': { label: 'Mock', icon: coreIcon },
+            'ai-other': { label: 'ai-other', icon: coreIcon }
+        });
+    });
+
+    test('no plugin manager yields empty icons', () => {
+        const menu = [{ provider: 'ai-mock', model: 'mock-echo' }];
+        expect(providerMap(menu, [mock], null)).toEqual({
+            'ai-mock': { label: 'Mock', icon: '' }
+        });
     });
 });
 

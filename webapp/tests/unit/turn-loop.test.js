@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -224,6 +224,82 @@ describe('turn loop', () => {
         expect(infos.filter(message => message.startsWith('retry:'))).toEqual(RETRYABLE_WAIT_MS.map((_slot, index) => {
             return formatRetryLog(index, 'AI_RATE_LIMIT', 'high demand', index === 0 ? headerMs : undefined);
         }));
+    });
+
+    async function runAlwaysRetryable(turnSettings, retryAfterMs) {
+        const thread = await seedThread();
+        const out = { errors: [], infos: [], waits: [], attempts: 0, thrown: null };
+        const prevLogger = global.LogController;
+        global.LogController = {
+            logInfo: (_req, _method, message) => out.infos.push(message),
+            logError: () => {},
+            logDebug: () => {}
+        };
+        try {
+            await runTurn({
+                actor: testActor(),
+                thread,
+                userText: 'keep failing',
+                settings: turnSettings,
+                hookManager: hooksWith({
+                    'onAiComplete:ai-mock': (ctx) => {
+                        out.attempts += 1;
+                        ctx.emit({
+                            type: 'error',
+                            code: 'AI_RATE_LIMIT',
+                            message: 'busy',
+                            retryable: true,
+                            retryAfterMs
+                        });
+                    }
+                }),
+                threadModel: AiThreadModel,
+                turnModel: AiTurnModel,
+                usageModel: AiUsageModel,
+                redisManager: { isRedisAvailable: () => false },
+                sleep: async (ms) => { out.waits.push(ms); },
+                sink: (event) => {
+                    if (event.type === 'error') {
+                        out.errors.push(event);
+                    }
+                }
+            });
+        } catch (error) {
+            out.thrown = error;
+        } finally {
+            global.LogController = prevLogger;
+        }
+        out.retryLines = out.infos.filter(message => message.startsWith('retry:'));
+        return out;
+    }
+
+    test('retry schedule and Retry-After cap come from settings', async () => {
+        const retry = { waits: [100, 5000], capMs: 1000 };
+        const out = await runAlwaysRetryable({ ...settings, retryWaitMs: retry.waits, retryAfterCapMs: retry.capMs }, 2500);
+        expect(out.attempts).toBe(3);
+        expect(out.waits).toEqual([100, 1000]);
+        expect(out.retryLines).toEqual([
+            formatRetryLog(0, 'AI_RATE_LIMIT', 'busy', 2500, retry),
+            formatRetryLog(1, 'AI_RATE_LIMIT', 'busy', 2500, retry)
+        ]);
+        expect(out.retryLines[1]).toMatch(/attempt 2 of 3: busy \(wait 1000ms\)$/);
+        expect(out.errors).toHaveLength(1);
+        expect(out.thrown && out.thrown.emitted).toBe(true);
+    });
+
+    test('an empty retry schedule makes one attempt', async () => {
+        const out = await runAlwaysRetryable({ ...settings, retryWaitMs: [] }, 0);
+        expect(out.attempts).toBe(1);
+        expect(out.waits).toEqual([]);
+        expect(out.retryLines).toEqual([]);
+        expect(out.errors).toHaveLength(1);
+    });
+
+    test('retryWaitMs and formatRetryLog use the default policy without settings', () => {
+        expect(retryWaitMs(0, 0)).toBe(RETRYABLE_WAIT_MS[0]);
+        expect(retryWaitMs(2, 60000)).toBe(RETRYABLE_WAIT_MS[2]);
+        expect(retryWaitMs(1, 60000, { waits: [1000, 90000], capMs: 0 })).toBe(30000);
+        expect(formatRetryLog(0, '', '', 0)).toBe(`retry: AI_PROVIDER_ERROR attempt 1 of ${RETRYABLE_WAIT_MS.length + 1}: provider error (wait ${RETRYABLE_WAIT_MS[0]}ms)`);
     });
 
     test('fatal provider error', async () => {

@@ -4,7 +4,7 @@
  * @tagline         AI Core plugin overview
  * @description     Dashboard card and overview for the AI agent server core
  * @file            plugins/ai-core/webapp/view/jpulse-plugins/ai-core.shtml
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -36,6 +36,22 @@
 
     .local-row-unavailable td {
         color: var(--jp-theme-text-secondary, #666);
+    }
+
+    .local-provider-icon {
+        display: inline-block;
+        margin-right: 0.4em;
+        vertical-align: -0.15em;
+    }
+
+    .local-provider-icon svg {
+        display: block;
+        width: 1em;
+        height: 1em;
+    }
+
+    .local-row-unavailable .local-provider-icon {
+        opacity: 0.45;
     }
 
     .local-help-links {
@@ -154,6 +170,18 @@
                     tr.appendChild(td);
                 });
                 body.appendChild(tr);
+                return tr;
+            }
+
+            function prependIcon(cell, svg) {
+                if (!cell || typeof svg !== 'string' || !/^<svg[\s>]/i.test(svg)) {
+                    return;
+                }
+                const icon = document.createElement('span');
+                icon.className = 'local-provider-icon';
+                icon.setAttribute('aria-hidden', 'true');
+                icon.innerHTML = svg;
+                cell.insertBefore(icon, cell.firstChild);
             }
 
             const result = await jPulse.api.get('/api/1/ai/capability');
@@ -179,16 +207,19 @@
             status.textContent = '';
             statsCard.hidden = false;
 
+            const providers = data.providers || {};
             models.forEach(function (row) {
                 const unavailable = row.available === false;
                 const vision = row.capabilities && row.capabilities.vision === true;
-                fillRow('ai-capability-models', [
+                const provider = providers[row.provider] || {};
+                const tr = fillRow('ai-capability-models', [
                     row.provider || '',
                     row.model || '',
                     row.label || '',
                     vision ? 'yes' : 'no',
                     unavailable ? ('unavailable' + (row.reason ? ' (' + row.reason + ')' : '')) : 'available'
                 ], unavailable);
+                prependIcon(tr.firstChild, provider.icon);
             });
             if (models.length) {
                 modelsWrap.hidden = false;

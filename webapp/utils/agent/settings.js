@@ -3,7 +3,7 @@
  * @tagline         Effective AI settings
  * @description     Site config tab, optional app.conf.ai, and plugin debug flag
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -17,6 +17,11 @@ import { DEFAULT_CAPS } from './quota.js';
 
 let cachedSettings = null;
 
+export const DEFAULT_RETRY_WAIT_MS = Object.freeze([2000, 4000, 10000]);
+export const DEFAULT_RETRY_AFTER_CAP_MS = 30000;
+export const RETRY_WAIT_MAX_MS = 60000;
+export const RETRY_WAIT_MAX_ENTRIES = 5;
+
 export const AI_CONFIG_DEFAULTS = {
     enabled: true,
     allowedRoles: ['user', 'admin', 'root'],
@@ -27,6 +32,8 @@ export const AI_CONFIG_DEFAULTS = {
     maxTokensPerDay: 400000,
     maxRoundsPerTurn: 8,
     turnTimeoutMs: 120000,
+    retryWaitMs: DEFAULT_RETRY_WAIT_MS.slice(),
+    retryAfterCapMs: DEFAULT_RETRY_AFTER_CAP_MS,
     defaultToolTimeoutMs: 10000,
     maxContextChars: 100000,
     disabledTools: [],
@@ -82,6 +89,26 @@ function asLines(value) {
     return [];
 }
 
+/**
+ * Never saved (undefined/null) is the default schedule; a saved empty value
+ * is no retries. Entries are clamped to 0..RETRY_WAIT_MAX_MS, at most
+ * RETRY_WAIT_MAX_ENTRIES, non-numeric entries dropped.
+ * @param {string|number[]|null|undefined} value
+ * @returns {number[]}
+ */
+export function parseRetryWaits(value) {
+    if (value === undefined || value === null) {
+        return DEFAULT_RETRY_WAIT_MS.slice();
+    }
+    const list = Array.isArray(value) ? value : String(value).split(/[\s,]+/);
+    return list
+        .filter(entry => String(entry).trim() !== '')
+        .map(Number)
+        .filter(Number.isFinite)
+        .map(ms => Math.min(Math.max(Math.round(ms), 0), RETRY_WAIT_MAX_MS))
+        .slice(0, RETRY_WAIT_MAX_ENTRIES);
+}
+
 export function cacheSettings(settings) {
     cachedSettings = settings || null;
     return cachedSettings;
@@ -126,6 +153,10 @@ export function mergeSettings(sources = {}) {
         turnTimeoutMs: Number.isFinite(site.turnTimeoutMs)
             ? site.turnTimeoutMs
             : AI_CONFIG_DEFAULTS.turnTimeoutMs,
+        retryWaitMs: parseRetryWaits(site.retryWaitMs),
+        retryAfterCapMs: Number.isFinite(site.retryAfterCapMs) && site.retryAfterCapMs > 0
+            ? site.retryAfterCapMs
+            : AI_CONFIG_DEFAULTS.retryAfterCapMs,
         defaultToolTimeoutMs: Number.isFinite(site.defaultToolTimeoutMs)
             ? site.defaultToolTimeoutMs
             : AI_CONFIG_DEFAULTS.defaultToolTimeoutMs,

@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,7 +14,14 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
-import { cacheSettings, loadSettings, mergeSettings } from '../../utils/agent/settings.js';
+import {
+    cacheSettings,
+    DEFAULT_RETRY_AFTER_CAP_MS,
+    DEFAULT_RETRY_WAIT_MS,
+    loadSettings,
+    mergeSettings,
+    parseRetryWaits
+} from '../../utils/agent/settings.js';
 
 afterEach(() => {
     delete global.PluginModel;
@@ -100,6 +107,43 @@ describe('settings', () => {
         };
         const settings = await loadSettings({ pluginModel, configModel: { findById: async () => null } });
         expect(settings.debugDumps).toBe(false);
+    });
+
+    test('retry waits: unset is the default schedule, saved empty is no retries', () => {
+        expect(DEFAULT_RETRY_WAIT_MS).toEqual([2000, 4000, 10000]);
+        expect(mergeSettings({ site: {} }).retryWaitMs).toEqual([2000, 4000, 10000]);
+        expect(mergeSettings({ site: { retryWaitMs: null } }).retryWaitMs).toEqual([2000, 4000, 10000]);
+        expect(mergeSettings({ site: { retryWaitMs: '' } }).retryWaitMs).toEqual([]);
+        expect(mergeSettings({ site: { retryWaitMs: '  ' } }).retryWaitMs).toEqual([]);
+        expect(mergeSettings({ site: { retryWaitMs: '500, 1500' } }).retryWaitMs).toEqual([500, 1500]);
+    });
+
+    test('retry waits are clamped, capped at 5 entries, and drop non-numbers', () => {
+        expect(parseRetryWaits('100, abc, -5, 90000, 250.6')).toEqual([100, 0, 60000, 251]);
+        expect(parseRetryWaits('1 2 3 4 5 6 7')).toEqual([1, 2, 3, 4, 5]);
+        expect(parseRetryWaits([3000, '4000'])).toEqual([3000, 4000]);
+    });
+
+    test('retryAfterCapMs defaults to 30 s and accepts a positive number', () => {
+        expect(DEFAULT_RETRY_AFTER_CAP_MS).toBe(30000);
+        expect(mergeSettings({ site: {} }).retryAfterCapMs).toBe(30000);
+        expect(mergeSettings({ site: { retryAfterCapMs: 0 } }).retryAfterCapMs).toBe(30000);
+        expect(mergeSettings({ site: { retryAfterCapMs: -1 } }).retryAfterCapMs).toBe(30000);
+        expect(mergeSettings({ site: { retryAfterCapMs: 5000 } }).retryAfterCapMs).toBe(5000);
+    });
+
+    test('config schema and translations carry the retry settings', () => {
+        const root = path.resolve(process.cwd(), 'plugins/ai-core/webapp');
+        const controller = fs.readFileSync(path.join(root, 'controller/aiCore.js'), 'utf8');
+        expect(controller).toMatch(/retryWaitMs: \{/);
+        expect(controller).toMatch(/retryAfterCapMs: \{/);
+        ['en.conf', 'de.conf'].forEach((file) => {
+            const conf = fs.readFileSync(path.join(root, 'translations', file), 'utf8');
+            expect(conf).toMatch(/retryWaitMs:\s+'/);
+            expect(conf).toMatch(/retryWaitMsHelp:\s+'/);
+            expect(conf).toMatch(/retryAfterCapMs:\s+'/);
+            expect(conf).toMatch(/retryAfterCapMsHelp:\s+'/);
+        });
     });
 });
 

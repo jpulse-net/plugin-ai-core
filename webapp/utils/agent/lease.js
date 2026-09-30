@@ -3,7 +3,7 @@
  * @tagline         Single-flight turn lease
  * @description     Redis SET PX NX when available; in-process map when it is not
  * @file            plugins/ai-core/webapp/utils/agent/lease.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

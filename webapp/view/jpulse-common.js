@@ -3,7 +3,7 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -194,7 +194,7 @@ if (!window.jPulse) {
     const DEFAULT_COMMANDS = [
         { name: 'help' },
         { name: 'tools' },
-        { name: 'model' },
+        { name: 'model', aliases: ['models'] },
         { name: 'new', aliases: ['clear'] },
         { name: 'cancel' },
         { name: 'delete' },
@@ -2260,13 +2260,15 @@ if (!window.jPulse) {
             els.input.focus();
         }
 
-        function appendLinkedRow(parent, row) {
-            const parsed = parseExampleRow(row);
-            if (!parsed) {
-                return;
-            }
-            const line = document.createElement('div');
-            line.className = 'plg-ai-help-line';
+        /**
+         * A row of a linked list block. `marker` is null (the row starts with
+         * its own `/command`), 'bullet', or `{ icon }` with a server-checked SVG.
+         */
+        function listRow(text, marker, off) {
+            return { listItem: true, text: text, marker: marker || null, off: !!off };
+        }
+
+        function fillLinkedParts(target, parsed) {
             parsed.parts.forEach((part) => {
                 if (part.type === 'link') {
                     const btn = document.createElement('button');
@@ -2276,18 +2278,81 @@ if (!window.jPulse) {
                     btn.addEventListener('click', () => {
                         fillCompose(part.prompt);
                     });
-                    line.appendChild(btn);
+                    target.appendChild(btn);
                     return;
                 }
-                line.appendChild(document.createTextNode(part.text));
+                target.appendChild(document.createTextNode(part.text));
             });
+        }
+
+        function appendLinkedRow(parent, row) {
+            const parsed = parseExampleRow(row);
+            if (!parsed) {
+                return;
+            }
+            const line = document.createElement('div');
+            line.className = 'plg-ai-help-line';
+            fillLinkedParts(line, parsed);
             parent.appendChild(line);
+        }
+
+        function appendListItem(list, row) {
+            const parsed = parseExampleRow(row.text);
+            if (!parsed) {
+                return;
+            }
+            const item = document.createElement('li');
+            item.className = 'plg-ai-help-item';
+            if (row.off) {
+                item.classList.add('plg-ai-help-item--off');
+            }
+            const marker = row.marker;
+            const icon = marker && typeof marker.icon === 'string' && /^<svg[\s>]/i.test(marker.icon)
+                ? marker.icon
+                : '';
+            if (marker) {
+                const mark = document.createElement('span');
+                mark.className = 'plg-ai-help-marker';
+                mark.setAttribute('aria-hidden', 'true');
+                if (icon) {
+                    mark.classList.add('plg-ai-model-icon');
+                    mark.innerHTML = icon;
+                } else {
+                    mark.textContent = '•';
+                }
+                item.classList.add('plg-ai-help-item--marked');
+                item.appendChild(mark);
+            }
+            const text = document.createElement('span');
+            text.className = 'plg-ai-help-text';
+            fillLinkedParts(text, parsed);
+            item.appendChild(text);
+            list.appendChild(item);
+        }
+
+        function linkedList(rows) {
+            const list = document.createElement('ul');
+            list.className = 'plg-ai-help-list';
+            rows.forEach((row) => {
+                appendListItem(list, row);
+            });
+            return list;
         }
 
         function linkedBlock(lines) {
             const wrap = document.createElement('div');
             wrap.className = 'plg-ai-help';
+            let list = null;
             (lines || []).forEach((row) => {
+                if (row && row.listItem) {
+                    if (!list) {
+                        list = linkedList([]);
+                        wrap.appendChild(list);
+                    }
+                    appendListItem(list, row);
+                    return;
+                }
+                list = null;
                 if (row === '') {
                     const gap = document.createElement('div');
                     gap.className = 'plg-ai-help-gap';
@@ -2302,9 +2367,9 @@ if (!window.jPulse) {
         function slashHelpNode() {
             const wrap = document.createElement('div');
             wrap.className = 'plg-ai-help';
-            visibleCatalog().forEach((cmd) => {
-                appendLinkedRow(wrap, `[[/${cmd.name}]] — ${slashHint(cmd)}`);
-            });
+            wrap.appendChild(linkedList(visibleCatalog().map((cmd) => {
+                return listRow(`[[/${cmd.name}]] — ${slashHint(cmd)}`);
+            })));
             const examples = Array.isArray(options.examples) ? options.examples : [];
             if (!examples.length) {
                 return wrap;
@@ -2313,9 +2378,9 @@ if (!window.jPulse) {
             heading.className = 'plg-ai-help-examples-label';
             heading.textContent = I18N.slashExamples;
             wrap.appendChild(heading);
-            examples.forEach((row) => {
-                appendLinkedRow(wrap, row);
-            });
+            wrap.appendChild(linkedList(examples.map((row) => {
+                return listRow(row, 'bullet');
+            })));
             return wrap;
         }
 
@@ -2356,11 +2421,14 @@ if (!window.jPulse) {
                 '',
                 I18N.available + ':'
             );
+            const providers = cap.providers || {};
             (cap.models || []).forEach((row) => {
                 const pair = `${row.provider}/${row.model}`;
                 const label = row.label && row.label !== pair ? ` — ${row.label}` : '';
-                const off = row.available === false ? ' (off)' : '';
-                lines.push(`[[/model ${pair}]]${label}${off}`);
+                const unavailable = row.available === false;
+                const off = unavailable ? ' (off)' : '';
+                const icon = providers[row.provider] && providers[row.provider].icon;
+                lines.push(listRow(`[[/model ${pair}]]${label}${off}`, icon ? { icon: icon } : 'bullet', unavailable));
             });
             return lines;
         }
@@ -2464,7 +2532,7 @@ if (!window.jPulse) {
                 return fillToken(I18N.slashConversationsOpened, '%LABEL%', threadOptionLabel(thread));
             }
             return linkedBlock(threads.map((thread, idx) => {
-                return `[[/conversations ${idx + 1}]] — ${threadOptionLabel(thread)}`;
+                return listRow(`[[/conversations ${idx + 1}]] — ${threadOptionLabel(thread)}`);
             }));
         }
 

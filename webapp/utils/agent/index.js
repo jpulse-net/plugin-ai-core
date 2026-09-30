@@ -3,7 +3,7 @@
  * @tagline         Agent layer public surface
  * @description     Turn loop, quota, lease, prompt, providers — no transport imports
  * @file            plugins/ai-core/webapp/utils/agent/index.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -26,7 +26,9 @@ export {
     pairOnMenu,
     pickDefaultModel,
     priceForModel,
-    queryHasImages
+    providerMap,
+    queryHasImages,
+    safeSvgIcon
 } from './providers.js';
 export {
     DEFAULT_CAPS,
@@ -41,9 +43,12 @@ export {
 export {
     AI_CONFIG_DEFAULTS,
     cacheSettings,
+    DEFAULT_RETRY_AFTER_CAP_MS,
+    DEFAULT_RETRY_WAIT_MS,
     getCachedSettings,
     loadSettings,
     mergeSettings,
+    parseRetryWaits,
     roleAllowed
 } from './settings.js';
 export { deleteByScope } from './scope.js';

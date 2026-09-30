@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.17
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.18
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -247,10 +247,11 @@ What a site adds through `onAiPromptFragment` is domain steering — where to pu
 
 ## Admin
 
-Site Configuration → AI Agent holds the master switch, roles, models, quota, loop limits (including the default tool timeout), tool policy, retention, auto-title, site instructions, the false-claim phrase list, and the source / URL / convert / image caps. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.
+Site Configuration → AI Agent holds the master switch, roles, models, quota, loop limits (including the default tool timeout and the retry schedule: retry waits, default `2000, 4000, 10000` ms, empty for no retries, and the Retry-After cap, default 30000 ms), tool policy, retention, auto-title, site instructions, the false-claim phrase list, and the source / URL / convert / image caps. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core.
 
 ## Plugin releases
 
+- **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.
 - **1.0.17**, W-252, 2026-09-30: A retryable provider error is logged and not shown until the last attempt fails. A success after a retry shows no error. The WebSocket handler does not send that error a second time. Waits are 2s, 4s, and 10s; a Retry-After header can only shorten a wait. Install lines name OpenAI and Google beside Anthropic. `ai-mock` and `hello-ai` lockstep.
 - **1.0.16**, W-248, 2026-09-22: Hello AI adds Code Examples and Architecture beside the scratch pad. No ai-core product change. `ai-mock` lockstep.
 - **1.0.15**, W-247, 2026-09-21: The Trash button or `/delete` removes the open conversation after a confirm, then binds the newest remaining conversation or a new empty one. A partially purged transcript shows that older messages were removed after N days. The keep-for-N-days policy is shown as an info toast. `ai-mock` and `hello-ai` lockstep.

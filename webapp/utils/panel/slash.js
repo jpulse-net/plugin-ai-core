@@ -3,7 +3,7 @@
  * @tagline         Panel slash-command catalog
  * @description     One catalog for the picker, parser, aliases, and /help
  * @file            plugins/ai-core/webapp/utils/panel/slash.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -32,7 +32,7 @@ function whenContext(ctx) {
 export const DEFAULT_COMMANDS = [
     { name: 'help' },
     { name: 'tools' },
-    { name: 'model' },
+    { name: 'model', aliases: ['models'] },
     { name: 'new', aliases: ['clear'] },
     { name: 'cancel' },
     { name: 'delete' },

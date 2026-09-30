@@ -2,7 +2,7 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.17
+ * @version         1.0.18
  * @release         2026-09-30
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -261,6 +261,44 @@ describe('slash catalog', () => {
         expect(filterSlashCommands('/model ai-mock/mock-echo', catalog, {}).map((row) => row.name)).toEqual(['model']);
         expect(filterSlashCommands('//help', catalog, {})).toEqual([]);
         expect(filterSlashCommands('help', catalog, {})).toEqual([]);
+    });
+
+    test('/models is an unlisted alias of /model', () => {
+        const catalog = normalizeCatalog();
+        expect(parseSlashCommand('/models', catalog)).toEqual({ kind: 'command', name: 'model', arg: '' });
+        expect(parseSlashCommand('/models ai-mock/mock-echo', catalog)).toEqual({
+            kind: 'command',
+            name: 'model',
+            arg: 'ai-mock/mock-echo'
+        });
+        expect(filterSlashCommands('/models', catalog, {}).map((row) => row.name)).toEqual(['model']);
+        expect(catalog.map((row) => row.name)).not.toContain('models');
+        const panel = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js'),
+            'utf8'
+        );
+        expect(panel).toMatch(/\{ name: 'model', aliases: \['models'\] \}/);
+    });
+
+    test('linked blocks render list rows: icon for /model, bullet for examples, none for commands', () => {
+        const panel = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.js'),
+            'utf8'
+        );
+        expect(panel).toMatch(/function listRow\(text, marker, off\)/);
+        expect(panel).toMatch(/list\.className = 'plg-ai-help-list'/);
+        expect(panel).toMatch(/document\.createElement\('li'\)/);
+        expect(panel).toMatch(/listRow\(`\[\[\/model \$\{pair\}\]\]\$\{label\}\$\{off\}`, icon \? \{ icon: icon \} : 'bullet', unavailable\)/);
+        expect(panel).toMatch(/listRow\(row, 'bullet'\)/);
+        expect(panel).toMatch(/listRow\(`\[\[\/\$\{cmd\.name\}\]\] — \$\{slashHint\(cmd\)\}`\)/);
+        expect(panel).toMatch(/listRow\(`\[\[\/conversations \$\{idx \+ 1\}\]\] — \$\{threadOptionLabel\(thread\)\}`\)/);
+        expect(panel).toMatch(/mark\.setAttribute\('aria-hidden', 'true'\)/);
+        const css = fs.readFileSync(
+            path.resolve(process.cwd(), 'plugins/ai-core/webapp/view/jpulse-common.css'),
+            'utf8'
+        );
+        expect(css).toMatch(/\.plg-ai-help-list\s*\{[^}]*list-style:\s*none/);
+        expect(css).toMatch(/\.plg-ai-help-item--off \.plg-ai-model-icon\s*\{[^}]*opacity/);
     });
 
     test('history skips user-only turns so they do not poison the next request', () => {
