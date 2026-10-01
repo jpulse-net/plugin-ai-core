@@ -3,8 +3,8 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -18,8 +18,10 @@ import {
     filterAllowedModels,
     firstExceededCap,
     gateModelsForVision,
+    historyRange,
     listProviders,
     loadSettings,
+    periodRange,
     onAiQuotaCheck,
     onAiQuotaSettle,
     pairOnMenu,
@@ -155,6 +157,14 @@ class AiCoreController {
             contextKeys: ['actor', 'scopeId', 'scopeType', 'scope'],
             since: '1.0.0'
         },
+        onAiScopeTypes: {
+            description: 'Name the scope types this site or plugin defines',
+            mode: 'execute',
+            onError: 'continue',
+            canModify: true,
+            contextKeys: ['req', 'scopeTypes'],
+            since: '1.0.19'
+        },
         onAiPromptFragment: {
             description: 'Contribute system-prompt fragments',
             mode: 'execute',
@@ -164,19 +174,19 @@ class AiCoreController {
             since: '1.0.0'
         },
         onAiQuotaCheck: {
-            description: 'Resolve the subject and its caps, and reserve; veto by throwing',
+            description: 'Resolve the username and its caps, and reserve; veto by throwing',
             mode: 'executeFirst',
             onError: 'abort',
             canModify: true,
-            contextKeys: ['actor', 'settings', 'quota'],
+            contextKeys: ['actor', 'settings', 'now', 'usageModel', 'thread', 'provider', 'model', 'quota'],
             since: '1.0.0'
         },
         onAiQuotaSettle: {
-            description: 'Apply actual usage',
+            description: 'Apply actual usage to the reserved username',
             mode: 'execute',
             onError: 'continue',
             canModify: true,
-            contextKeys: ['actor', 'quota', 'usage'],
+            contextKeys: ['actor', 'quota', 'usage', 'scope'],
             since: '1.0.0'
         },
         onAiTurnBefore: {
@@ -299,15 +309,23 @@ class AiCoreController {
                         label: '{{i18n.view.ui.ai.config.allowedModels}}',
                         help: '{{i18n.view.ui.ai.config.allowedModelsHelp}}'
                     },
-                    maxRequestsPerDay: {
+                    maxUserRequestsPerDay: {
                         type: 'number',
                         default: 200,
-                        label: '{{i18n.view.ui.ai.config.maxRequestsPerDay}}'
+                        label: '{{i18n.view.ui.ai.config.maxUserRequestsPerDay}}',
+                        help: '{{i18n.view.ui.ai.config.maxUserRequestsPerDayHelp}}'
                     },
-                    maxTokensPerDay: {
+                    maxUserTokensPerDay: {
                         type: 'number',
                         default: 400000,
-                        label: '{{i18n.view.ui.ai.config.maxTokensPerDay}}'
+                        label: '{{i18n.view.ui.ai.config.maxUserTokensPerDay}}',
+                        help: '{{i18n.view.ui.ai.config.maxUserTokensPerDayHelp}}'
+                    },
+                    maxUserCostPerMonth: {
+                        type: 'number',
+                        default: 0,
+                        label: '{{i18n.view.ui.ai.config.maxUserCostPerMonth}}',
+                        help: '{{i18n.view.ui.ai.config.maxUserCostPerMonthHelp}}'
                     },
                     maxRoundsPerTurn: {
                         type: 'number',
@@ -363,7 +381,8 @@ class AiCoreController {
                     retentionDays: {
                         type: 'number',
                         default: 90,
-                        label: '{{i18n.view.ui.ai.config.retentionDays}}'
+                        label: '{{i18n.view.ui.ai.config.retentionDays}}',
+                        help: '{{i18n.view.ui.ai.config.retentionDaysHelp}}'
                     },
                     autoTitle: {
                         type: 'boolean',
@@ -510,18 +529,8 @@ class AiCoreController {
         registerTools(sourceToolDescriptors(), 'ai-core');
         await registerAiNamespace();
 
-        const settings = await loadSettings();
-        if (settings.retentionDays > 0) {
-            const cutoff = new Date(Date.now() - settings.retentionDays * 86400000);
-            try {
-                const purged = await AiTurnModel.purgeOlderThan(cutoff);
-                if (purged) {
-                    LogController?.logInfo?.(null, 'aiCore.initialize', `success: purged ${purged} old turns`);
-                }
-            } catch (error) {
-                LogController?.logError?.(null, 'aiCore.initialize', `error: retention ${error.message}`);
-            }
-        }
+        await this.purgeOldTurns();
+        this.startRetentionTimer();
 
         global.AiCore = {
             registerTools,
@@ -1319,34 +1328,191 @@ class AiCoreController {
         }
     }
 
+    static _retentionTimer = null;
+
+    static async purgeOldTurns() {
+        const settings = await loadSettings();
+        if (!(Number(settings.retentionDays) > 0)) {
+            return 0;
+        }
+        const cutoff = new Date(Date.now() - settings.retentionDays * 86400000);
+        try {
+            const purged = await AiTurnModel.purgeOlderThan(cutoff);
+            if (purged) {
+                LogController?.logInfo?.(null, 'aiCore.retention', `success: purged ${purged} old turns`);
+            }
+            return purged;
+        } catch (error) {
+            LogController?.logError?.(null, 'aiCore.retention', `error: retention ${error.message}`);
+            return 0;
+        }
+    }
+
+    static startRetentionTimer() {
+        this.stopRetentionTimer();
+        const timer = setInterval(() => {
+            this.purgeOldTurns();
+        }, 24 * 60 * 60 * 1000);
+        if (typeof timer.unref === 'function') {
+            timer.unref();
+        }
+        this._retentionTimer = timer;
+        return timer;
+    }
+
+    static stopRetentionTimer() {
+        if (this._retentionTimer) {
+            clearInterval(this._retentionTimer);
+            this._retentionTimer = null;
+        }
+    }
+
     static async apiUsage(req, res) {
         const actor = actorFromRequest(req);
         try {
             logReq(req, 'aiCore.apiUsage', actor);
+            const raw = req.query?.per;
+            const per = raw == null || raw === '' ? 'day' : String(raw);
+            if (per !== 'day' && per !== 'month') {
+                return sendError(req, res, 400, 'per must be day or month', 'AI_BAD_ARGS');
+            }
+            const now = new Date();
+            const range = periodRange(per, now);
             const settings = await loadSettings();
-            const rows = (await AiUsageModel.listRecent(200)).map((row) => {
-                const key = String(row.periodKey || '');
-                const caps = (settings.caps || []).filter((cap) => {
-                    if (cap.period === 'day') {
-                        return /^\d{4}-\d{2}-\d{2}$/.test(key);
-                    }
-                    if (cap.period === 'month') {
-                        return /^\d{4}-\d{2}$/.test(key);
-                    }
-                    return false;
-                });
-                return {
-                    ...row,
-                    overQuota: !!firstExceededCap(row, caps)
-                };
-            });
-            res.json({ success: true, data: rows });
-            logOk(req, 'aiCore.apiUsage', actor, `${rows.length} rows`);
+            const summary = await AiUsageModel.summarize(range);
+            const historyRows = await AiUsageModel.history(historyRange(per, now), per);
+            const turns = await AiTurnModel.usageWindow(range.fromDay, range.toDay);
+            const named = [];
+            try {
+                if (global.HookManager?.execute) {
+                    await global.HookManager.execute('onAiScopeTypes', { req, scopeTypes: named });
+                }
+            } catch (error) {
+                logErr(req, 'aiCore.apiUsage', actor, error);
+            }
+            const labelByType = new Map();
+            for (const row of named) {
+                if (row?.scopeType && !labelByType.has(row.scopeType)) {
+                    labelByType.set(row.scopeType, row.label || row.scopeType);
+                }
+            }
+            const caps = (settings.caps || []).filter((cap) => cap.period === per);
+            const totals = summary.totals || {};
+            const data = {
+                per,
+                range,
+                cards: {
+                    requests: totals.requests || 0,
+                    tokens: totals.tokens || 0,
+                    cost: totals.cost || 0,
+                    costUnknown: totals.costUnknown === true,
+                    conversations: turns.conversations,
+                    failedOrStalled: turns.failedOrStalled
+                },
+                byUser: (summary.byUser || []).map((row) => usageUser(row, caps)).sort(bySpend),
+                byModel: (summary.byModel || []).map(usageModel).sort(bySpend),
+                byScope: (summary.byScope || []).map((row) => usageScope(row, labelByType)).sort(bySpend),
+                scopeTypes: [],
+                history: historyRows.map(usageHistory).sort(byPeriod)
+            };
+            const present = [...new Set(data.byScope.map((row) => row.scopeType))];
+            data.scopeTypes = present.map((scopeType) => ({
+                scopeType,
+                label: labelByType.get(scopeType) || scopeType
+            }));
+            res.json({ success: true, data });
+            logOk(req, 'aiCore.apiUsage', actor,
+                `${per}, ${data.byUser.length} users, ${data.byModel.length} models, ${data.byScope.length} scopes`);
         } catch (error) {
             logErr(req, 'aiCore.apiUsage', actor, error);
             return sendError(req, res, 500, 'Failed to read usage', 'AI_USAGE_FAILED');
         }
     }
+}
+
+function usageTotals(row) {
+    return {
+        requests: row.requests || 0,
+        reservedRequests: row.reservedRequests || 0,
+        tokens: row.tokens || 0,
+        tokensIn: row.tokensIn || 0,
+        tokensOut: row.tokensOut || 0,
+        cost: row.cost || 0,
+        costUnknown: row.costUnknown === true,
+        lastUsed: row.lastUsed || null
+    };
+}
+
+function bySpend(a, b) {
+    const aKnown = a.costUnknown !== true;
+    const bKnown = b.costUnknown !== true;
+    if (aKnown && bKnown && a.cost !== b.cost) {
+        return b.cost - a.cost;
+    }
+    return (b.tokens || 0) - (a.tokens || 0);
+}
+
+function byPeriod(a, b) {
+    if (a.period !== b.period) {
+        return a.period < b.period ? 1 : -1;
+    }
+    return String(a.username).localeCompare(String(b.username));
+}
+
+function usageUser(row, caps) {
+    const totals = usageTotals(row);
+    const doc = {
+        requests: totals.requests + totals.reservedRequests,
+        reservedRequests: 0,
+        tokens: totals.tokens,
+        cost: totals.cost,
+        costUnknown: totals.costUnknown
+    };
+    return {
+        username: row._id,
+        ...totals,
+        quota: {
+            overQuota: !!firstExceededCap(doc, caps),
+            rows: caps.map((cap) => ({
+                dimension: cap.dimension,
+                limit: cap.limit,
+                used: cap.dimension === 'requests'
+                    ? doc.requests
+                    : (doc[cap.dimension] || 0)
+            }))
+        }
+    };
+}
+
+function usageModel(row) {
+    return {
+        provider: row._id?.provider || '',
+        model: row._id?.model || '',
+        ...usageTotals(row)
+    };
+}
+
+function usageScope(row, labelByType) {
+    const scopeType = row._id?.scopeType || '';
+    const scopeId = row._id?.scopeId || '';
+    return {
+        scopeType,
+        scopeTypeLabel: labelByType.get(scopeType) || scopeType,
+        scopeId,
+        scopeLabel: row.scopeLabel || scopeId,
+        ...usageTotals(row)
+    };
+}
+
+function usageHistory(row) {
+    return {
+        period: row._id?.period || '',
+        username: row._id?.username || '',
+        requests: row.requests || 0,
+        tokens: row.tokens || 0,
+        cost: row.cost || 0,
+        costUnknown: row.costUnknown === true
+    };
 }
 
 export default AiCoreController;

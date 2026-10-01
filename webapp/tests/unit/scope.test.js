@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Scope
  * @tagline         AiCore.deleteByScope cascade
  * @file            plugins/ai-core/webapp/tests/unit/scope.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -113,7 +113,14 @@ describe('deleteByScope', () => {
             userText: 'keep',
             createdBy: 'alice'
         });
-        await AiUsageModel.reserve('alice', '2026-09-18', { requests: 1 });
+        await AiUsageModel.reserve({
+            day: '2026-09-18',
+            username: 'alice',
+            provider: '',
+            model: '',
+            scopeType: 'map',
+            scopeId: 'm1'
+        }, { requests: 1 });
         await stageImage('alice', String(a._id), 'img-1', { data: 'x', mimeType: 'image/png' }, {}, redis);
         const counts = await deleteByScope({ scopeType: 'map', scopeId: 'm1' }, {
             threadModel: AiThreadModel,
@@ -128,7 +135,14 @@ describe('deleteByScope', () => {
         expect((await AiThreadModel.listByScope({ scopeType: 'map', scopeId: 'm2' })).map((row) => String(row._id)))
             .toEqual([String(other._id)]);
         expect(await AiTurnModel.listByThread(String(other._id))).toHaveLength(1);
-        expect(await AiUsageModel.getByKey('alice', '2026-09-18')).toBeTruthy();
+        expect(await AiUsageModel.findIdentity({
+            day: '2026-09-18',
+            username: 'alice',
+            provider: '',
+            model: '',
+            scopeType: 'map',
+            scopeId: 'm1'
+        })).toBeTruthy();
         const again = await deleteByScope({ scopeType: 'map', scopeId: 'm1' }, {
             threadModel: AiThreadModel,
             turnModel: AiTurnModel,

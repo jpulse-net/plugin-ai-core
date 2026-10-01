@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -386,9 +386,58 @@ describe('turn loop', () => {
             }
         })).rejects.toMatchObject({ code: 'AI_LEASE_HELD' });
         expect(errors).toHaveLength(1);
-        const usage = await AiUsageModel.getByKey('jdoe', `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
+        const today = new Date();
+        const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const usage = await AiUsageModel.findIdentity({
+            day,
+            username: 'jdoe',
+            provider: 'ai-mock',
+            model: 'mock-echo',
+            scopeType: 'doc',
+            scopeId: 'doc-1'
+        });
         expect(usage.reservedRequests).toBe(0);
         expect(usage.requests || 0).toBe(0);
+    });
+
+    test('no provider does not reserve', async () => {
+        const thread = await seedThread();
+        await expect(runTurn({
+            actor: testActor(),
+            thread,
+            userText: 'x',
+            settings,
+            hookManager: createHookManager({
+                onAiQuotaCheck: (ctx) => onAiQuotaCheck(ctx)
+            }),
+            threadModel: AiThreadModel,
+            turnModel: AiTurnModel,
+            usageModel: AiUsageModel,
+            redisManager: { isRedisAvailable: () => false }
+        })).rejects.toMatchObject({ code: 'AI_NO_PROVIDER' });
+        expect(AiUsageModel.getCollection().docs).toHaveLength(0);
+    });
+
+    test('a completed turn settles on the chosen model and the resolved scope label', async () => {
+        const thread = await seedThread();
+        await runTurn({
+            actor: testActor(),
+            thread,
+            userText: '[mock:text] hi',
+            settings,
+            hookManager: hooksWith(),
+            threadModel: AiThreadModel,
+            turnModel: AiTurnModel,
+            usageModel: AiUsageModel,
+            redisManager: { isRedisAvailable: () => false }
+        });
+        const doc = AiUsageModel.getCollection().docs[0];
+        expect(doc.provider).toBe('ai-mock');
+        expect(doc.model).toBe('mock-echo');
+        expect(doc.scopeType).toBe('doc');
+        expect(doc.scopeId).toBe('doc-1');
+        expect(doc.scopeLabel).toBe('Doc');
+        expect(doc.requests).toBe(1);
     });
 
     test('empty completion', async () => {

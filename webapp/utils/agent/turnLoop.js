@@ -3,8 +3,8 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -195,13 +195,26 @@ export async function runTurn(params) {
 
     let quota = null;
     let reserved = false;
+    let chosen = null;
+    let providers = [];
     try {
+        providers = await listProviders(hookManager);
+        const menu = filterAllowedModels(providers, settings);
+        chosen = chooseProviderModel(menu, settings, params, thread);
+        if (!chosen) {
+            const error = new Error('No provider is available');
+            error.code = 'AI_NO_PROVIDER';
+            throw error;
+        }
         if (hookManager?.executeFirst) {
             const quotaCtx = {
                 actor,
                 settings,
                 now,
-                usageModel: params.usageModel
+                usageModel: params.usageModel,
+                thread,
+                provider: chosen.provider,
+                model: chosen.model
             };
             quota = await hookManager.executeFirst('onAiQuotaCheck', quotaCtx);
             if (!quota && quotaCtx.quota) {
@@ -226,7 +239,10 @@ export async function runTurn(params) {
                 quota,
                 usage: emptyUsage(),
                 started: false,
-                usageModel: params.usageModel
+                usageModel: params.usageModel,
+                thread,
+                provider: chosen.provider,
+                model: chosen.model
             });
         }
         const error = new Error('A turn is already running on this thread');
@@ -246,16 +262,9 @@ export async function runTurn(params) {
     const toolCalls = [];
     let costUnknown = false;
     let emittedError = false;
+    let lastScope = null;
 
     try {
-        const providers = await listProviders(hookManager);
-        const menu = filterAllowedModels(providers, settings);
-        const chosen = chooseProviderModel(menu, settings, params, thread);
-        if (!chosen) {
-            const error = new Error('No provider is available');
-            error.code = 'AI_NO_PROVIDER';
-            throw error;
-        }
         const provider = providers.find(p => p.plugin === chosen.provider) || {
             plugin: chosen.provider,
             priceTable: {},
@@ -314,6 +323,7 @@ export async function runTurn(params) {
                 scope: params.scope,
                 ...extras.resolve
             });
+            lastScope = resolved.scope || lastScope;
             const prompt = await assemblePrompt({
                 actor,
                 scope: resolved.scope,
@@ -543,14 +553,6 @@ export async function runTurn(params) {
             });
         }
 
-        if (status === 'canceled') {
-            sink({ type: 'canceled', turnId: String(turn._id) });
-        } else if (status === 'stalled') {
-            sink({ type: 'stalled', turnId: String(turn._id) });
-        } else if (status === 'completed') {
-            sink({ type: 'completed', turnId: String(turn._id), text: agentText });
-        }
-
         const price = priceForModel(provider, chosen.model);
         const cost = computeCost(usage, price);
         costUnknown = cost == null && (usage.tokensIn + usage.tokensOut) > 0;
@@ -567,6 +569,14 @@ export async function runTurn(params) {
             provider: chosen.provider,
             model: chosen.model
         });
+
+        if (status === 'canceled') {
+            sink({ type: 'canceled', turnId: String(turn._id) });
+        } else if (status === 'stalled') {
+            sink({ type: 'stalled', turnId: String(turn._id) });
+        } else if (status === 'completed') {
+            sink({ type: 'completed', turnId: String(turn._id), text: agentText });
+        }
         await threadModel.touch(thread._id);
 
         if (status === 'completed' && settings.autoTitle !== false && turn.seq === 1 && !thread.label) {
@@ -617,7 +627,11 @@ export async function runTurn(params) {
                     usage,
                     started: true,
                     costUnknown,
-                    usageModel: params.usageModel
+                    usageModel: params.usageModel,
+                    thread,
+                    provider: chosen?.provider || '',
+                    model: chosen?.model || '',
+                    scope: lastScope
                 });
             } catch (error) {
                 logError(req, 'aiCore.runTurn', `error: quota settle ${error.message}`, actor);

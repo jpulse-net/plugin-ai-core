@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <!--
  * @name            jPulse Framework / Plugins / AI Core / WebApp / View / Admin / AI Usage
- * @tagline         AI usage by subject and period
- * @description     Per-subject requests, tokens, and cost with over-quota and costUnknown flags
+ * @tagline         AI usage by user, model, and scope
+ * @description     Day or month view with cards, breakdowns, and history
  * @file            plugins/ai-core/webapp/view/admin/ai-usage.shtml
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -18,6 +18,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{i18n.view.ui.ai.usage.title}} - {{app.site.shortName}}</title>
     {{file.include "jpulse-header.tmpl"}}
+    <style>
+        .local-ai-usage-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .local-ai-usage-warn {
+            color: var(--jp-theme-color-warning-text);
+        }
+        .local-ai-usage-danger {
+            color: var(--jp-theme-color-danger-text);
+        }
+        .local-ai-usage-note {
+            color: var(--jp-theme-color-warning-text);
+            font-size: 0.85em;
+        }
+    </style>
 </head>
 <body>
     {{#component "adminCards.aiUsage" order=80}}
@@ -28,61 +45,317 @@
         </a>
     {{/component}}
     <div class="jp-main">
-        <h1>{{i18n.view.ui.ai.usage.heading}}</h1>
-        <p>{{i18n.view.ui.ai.usage.intro}}</p>
-        <div id="ai-usage-status" class="jp-muted"></div>
-        <div class="jp-table-wrap">
-            <table class="jp-table" id="ai-usage-table">
-                <thead>
-                    <tr>
-                        <th>{{i18n.view.ui.ai.usage.subject}}</th>
-                        <th>{{i18n.view.ui.ai.usage.period}}</th>
-                        <th>{{i18n.view.ui.ai.usage.requests}}</th>
-                        <th>{{i18n.view.ui.ai.usage.tokens}}</th>
-                        <th>{{i18n.view.ui.ai.usage.cost}}</th>
-                        <th>{{i18n.view.ui.ai.usage.flags}}</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div class="jp-page-header">
+            <h1>{{i18n.view.ui.ai.usage.heading}}</h1>
+            <div class="local-ai-usage-actions">
+                <div class="jp-btn-group" id="ai-usage-per">
+                    <button type="button" class="jp-btn" data-per="day">{{i18n.view.ui.ai.usage.day}}</button>
+                    <button type="button" class="jp-btn" data-per="month">{{i18n.view.ui.ai.usage.month}}</button>
+                </div>
+                <a class="jp-btn" href="/admin/config.shtml">{{i18n.view.ui.ai.usage.settings}}</a>
+            </div>
         </div>
+        <div id="ai-usage-status" class="jp-muted"></div>
+        <div class="jp-stats-grid" id="ai-usage-cards"></div>
+        <section class="jp-card" id="ai-usage-by-user"></section>
+        <section class="jp-card" id="ai-usage-by-model"></section>
+        <section class="jp-card" id="ai-usage-by-scope"></section>
+        <section class="jp-card" id="ai-usage-history"></section>
     </div>
+    <script type="application/json" id="ai-usage-i18n">{
+        "day": "{{i18n.view.ui.ai.usage.day}}",
+        "month": "{{i18n.view.ui.ai.usage.month}}",
+        "requestsToday": "{{i18n.view.ui.ai.usage.requestsToday}}",
+        "requestsMonth": "{{i18n.view.ui.ai.usage.requestsMonth}}",
+        "tokensToday": "{{i18n.view.ui.ai.usage.tokensToday}}",
+        "tokensMonth": "{{i18n.view.ui.ai.usage.tokensMonth}}",
+        "costToday": "{{i18n.view.ui.ai.usage.costToday}}",
+        "costMonth": "{{i18n.view.ui.ai.usage.costMonth}}",
+        "conversationsToday": "{{i18n.view.ui.ai.usage.conversationsToday}}",
+        "conversationsMonth": "{{i18n.view.ui.ai.usage.conversationsMonth}}",
+        "failedToday": "{{i18n.view.ui.ai.usage.failedToday}}",
+        "failedMonth": "{{i18n.view.ui.ai.usage.failedMonth}}",
+        "costUnknownLine": "{{i18n.view.ui.ai.usage.costUnknownLine}}",
+        "byUser": "{{i18n.view.ui.ai.usage.byUser}}",
+        "byModel": "{{i18n.view.ui.ai.usage.byModel}}",
+        "byScope": "{{i18n.view.ui.ai.usage.byScope}}",
+        "user": "{{i18n.view.ui.ai.usage.user}}",
+        "providerModel": "{{i18n.view.ui.ai.usage.providerModel}}",
+        "requests": "{{i18n.view.ui.ai.usage.requests}}",
+        "tokens": "{{i18n.view.ui.ai.usage.tokens}}",
+        "cost": "{{i18n.view.ui.ai.usage.cost}}",
+        "lastUsed": "{{i18n.view.ui.ai.usage.lastUsed}}",
+        "quota": "{{i18n.view.ui.ai.usage.quota}}",
+        "noCap": "{{i18n.view.ui.ai.usage.noCap}}",
+        "area": "{{i18n.view.ui.ai.usage.area}}",
+        "scope": "{{i18n.view.ui.ai.usage.scope}}",
+        "history": "{{i18n.view.ui.ai.usage.history}}",
+        "emptyToday": "{{i18n.view.ui.ai.usage.emptyToday}}",
+        "emptyMonth": "{{i18n.view.ui.ai.usage.emptyMonth}}",
+        "noPrice": "{{i18n.view.ui.ai.usage.noPrice}}",
+        "overQuota": "{{i18n.view.ui.ai.usage.overQuota}}",
+        "loadError": "{{i18n.view.ui.ai.usage.loadError}}"
+    }</script>
     {{file.include "jpulse-footer.tmpl"}}
     <script>
-        jPulse.dom.ready(async function () {
+        jPulse.dom.ready(function () {
+            const I18N = JSON.parse(document.getElementById('ai-usage-i18n').textContent);
             const status = document.getElementById('ai-usage-status');
-            const body = document.querySelector('#ai-usage-table tbody');
-            try {
-                const result = await jPulse.api.get('/api/1/ai/usage');
-                const rows = result.data || [];
+            const cards = document.getElementById('ai-usage-cards');
+            const byUser = document.getElementById('ai-usage-by-user');
+            const byModel = document.getElementById('ai-usage-by-model');
+            const byScope = document.getElementById('ai-usage-by-scope');
+            const historyHost = document.getElementById('ai-usage-history');
+            let per = new URLSearchParams(window.location.search).get('per') === 'month' ? 'month' : 'day';
+
+            function formatTokens(value) {
+                const n = Number(value) || 0;
+                const abs = Math.abs(n);
+                if (abs >= 1000000) {
+                    return trimNum(n / 1000000) + 'M';
+                }
+                if (abs >= 1000) {
+                    return trimNum(n / 1000) + 'k';
+                }
+                return String(n);
+            }
+
+            function trimNum(n) {
+                return String(Math.round(n * 10) / 10);
+            }
+
+            function formatCost(value, unknown) {
+                if (unknown) {
+                    return '—';
+                }
+                const n = Number(value) || 0;
+                if (n !== 0 && Math.abs(n) < 0.01) {
+                    return n < 0 ? '-<$0.01' : '<$0.01';
+                }
+                return '$' + n.toFixed(2);
+            }
+
+            function textCell(text, title) {
+                const td = document.createElement('td');
+                td.textContent = text;
+                if (title) {
+                    td.title = title;
+                }
+                return td;
+            }
+
+            function table(headers, rows, empty) {
+                const wrap = document.createElement('div');
+                wrap.className = 'jp-table-wrap';
+                const el = document.createElement('table');
+                el.className = 'jp-table';
+                const thead = document.createElement('thead');
+                const hr = document.createElement('tr');
+                headers.forEach((header) => {
+                    const th = document.createElement('th');
+                    th.textContent = header;
+                    hr.appendChild(th);
+                });
+                thead.appendChild(hr);
+                el.appendChild(thead);
+                const body = document.createElement('tbody');
                 if (!rows.length) {
-                    status.textContent = '{{i18n.view.ui.ai.usage.empty}}';
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = headers.length;
+                    td.textContent = empty;
+                    tr.appendChild(td);
+                    body.appendChild(tr);
+                } else {
+                    rows.forEach((cells) => {
+                        const tr = document.createElement('tr');
+                        cells.forEach((cell) => tr.appendChild(cell));
+                        body.appendChild(tr);
+                    });
+                }
+                el.appendChild(body);
+                wrap.appendChild(el);
+                return wrap;
+            }
+
+            function section(host, title, headers, rows) {
+                host.textContent = '';
+                const h = document.createElement('h2');
+                h.textContent = title;
+                host.appendChild(h);
+                host.appendChild(table(headers, rows, per === 'month' ? I18N.emptyMonth : I18N.emptyToday));
+            }
+
+            function quotaCell(quota) {
+                const td = document.createElement('td');
+                const rows = quota && quota.rows;
+                if (!rows || !rows.length) {
+                    td.textContent = I18N.noCap;
+                    return td;
+                }
+                rows.forEach((row, index) => {
+                    if (index) {
+                        td.appendChild(document.createTextNode(', '));
+                    }
+                    const used = row.dimension === 'cost' ? formatCost(row.used, false) : formatTokens(row.used);
+                    const limit = row.dimension === 'cost' ? formatCost(row.limit, false) : formatTokens(row.limit);
+                    const span = document.createElement('span');
+                    span.textContent = used + ' / ' + limit;
+                    if (row.dimension === 'tokens') {
+                        span.textContent += ' ' + I18N.tokens.toLowerCase();
+                    }
+                    td.appendChild(span);
+                });
+                if (quota.overQuota) {
+                    td.className = 'local-ai-usage-danger';
+                    td.appendChild(document.createTextNode(' ' + I18N.overQuota));
+                }
+                return td;
+            }
+
+            function costCell(row, noPrice) {
+                const td = textCell(formatCost(row.cost, false), String(row.cost == null ? '' : row.cost));
+                if (row.costUnknown && noPrice) {
+                    td.className = 'local-ai-usage-warn';
+                    td.textContent = I18N.noPrice;
+                    td.title = '';
+                } else if (row.costUnknown) {
+                    td.className = 'local-ai-usage-warn';
+                }
+                return td;
+            }
+
+            function whenCell(value) {
+                if (!value) {
+                    return textCell('');
+                }
+                return textCell(jPulse.date.formatLocalDateAndTime(value));
+            }
+
+            function render(data) {
+                const month = data.per === 'month';
+                const empty = month ? I18N.emptyMonth : I18N.emptyToday;
+                cards.textContent = '';
+                const cardRows = [
+                    [month ? I18N.requestsMonth : I18N.requestsToday, String(data.cards.requests || 0)],
+                    [month ? I18N.tokensMonth : I18N.tokensToday, formatTokens(data.cards.tokens), String(data.cards.tokens || 0)],
+                    [month ? I18N.costMonth : I18N.costToday, formatCost(data.cards.cost, false), String(data.cards.cost || 0)],
+                    [month ? I18N.conversationsMonth : I18N.conversationsToday, String(data.cards.conversations || 0)],
+                    [month ? I18N.failedMonth : I18N.failedToday, String(data.cards.failedOrStalled || 0)]
+                ];
+                cardRows.forEach((row) => {
+                    const card = document.createElement('div');
+                    card.className = 'jp-stat-card';
+                    const value = document.createElement('div');
+                    value.textContent = row[1];
+                    if (row[2]) {
+                        value.title = row[2];
+                    }
+                    const label = document.createElement('div');
+                    label.textContent = row[0];
+                    card.appendChild(value);
+                    card.appendChild(label);
+                    if (row[0] === (month ? I18N.costMonth : I18N.costToday) && data.cards.costUnknown) {
+                        const note = document.createElement('div');
+                        note.className = 'local-ai-usage-note';
+                        note.textContent = I18N.costUnknownLine;
+                        card.appendChild(note);
+                    }
+                    cards.appendChild(card);
+                });
+                section(byUser, I18N.byUser, [I18N.user, I18N.requests, I18N.tokens, I18N.cost, I18N.lastUsed, I18N.quota],
+                    (data.byUser || []).map((row) => [
+                        textCell(row.username || ''),
+                        textCell(String(row.requests || 0)),
+                        textCell(formatTokens(row.tokens), String(row.tokens || 0)),
+                        costCell(row),
+                        whenCell(row.lastUsed),
+                        quotaCell(row.quota)
+                    ]));
+                section(byModel, I18N.byModel, [I18N.providerModel, I18N.requests, I18N.tokens, I18N.cost],
+                    (data.byModel || []).map((row) => [
+                        textCell((row.provider || '') + ' / ' + (row.model || '')),
+                        textCell(String(row.requests || 0)),
+                        textCell(formatTokens(row.tokens), String(row.tokens || 0)),
+                        costCell(row, true)
+                    ]));
+                const types = data.scopeTypes || [];
+                if (types.length === 1) {
+                    const label = types[0].label || types[0].scopeType;
+                    section(byScope, label, [label, I18N.requests, I18N.tokens, I18N.cost, I18N.lastUsed],
+                        (data.byScope || []).map((row) => [
+                            textCell(row.scopeLabel || row.scopeId || ''),
+                            textCell(String(row.requests || 0)),
+                            textCell(formatTokens(row.tokens), String(row.tokens || 0)),
+                            costCell(row),
+                            whenCell(row.lastUsed)
+                        ]));
+                } else if (types.length > 1) {
+                    section(byScope, I18N.byScope, [I18N.area, I18N.scope, I18N.requests, I18N.tokens, I18N.cost, I18N.lastUsed],
+                        (data.byScope || []).map((row) => [
+                            textCell(row.scopeTypeLabel || row.scopeType || ''),
+                            textCell(row.scopeLabel || row.scopeId || ''),
+                            textCell(String(row.requests || 0)),
+                            textCell(formatTokens(row.tokens), String(row.tokens || 0)),
+                            costCell(row),
+                            whenCell(row.lastUsed)
+                        ]));
+                } else {
+                    section(byScope, I18N.byScope, [I18N.scope], []);
+                }
+                section(historyHost, I18N.history, [month ? I18N.month : I18N.day, I18N.user, I18N.requests, I18N.tokens, I18N.cost],
+                    (data.history || []).map((row) => [
+                        textCell(row.period || ''),
+                        textCell(row.username || ''),
+                        textCell(String(row.requests || 0)),
+                        textCell(formatTokens(row.tokens), String(row.tokens || 0)),
+                        costCell(row)
+                    ]));
+                if (!(data.byUser || []).length && !(data.byModel || []).length) {
+                    status.textContent = empty;
+                } else {
+                    status.textContent = '';
+                }
+            }
+
+            function markPer() {
+                document.querySelectorAll('#ai-usage-per button').forEach((button) => {
+                    button.classList.toggle('jp-btn-primary', button.getAttribute('data-per') === per);
+                });
+            }
+
+            async function load() {
+                markPer();
+                status.textContent = '';
+                try {
+                    const result = await jPulse.api.get('/api/1/ai/usage?per=' + encodeURIComponent(per));
+                    if (!result.success) {
+                        status.textContent = result.error || I18N.loadError;
+                        return;
+                    }
+                    render(result.data || {});
+                } catch (error) {
+                    status.textContent = error.message || I18N.loadError;
+                }
+            }
+
+            document.getElementById('ai-usage-per').addEventListener('click', (event) => {
+                const button = event.target.closest('button');
+                if (!button) {
                     return;
                 }
-                status.textContent = '';
-                for (const row of rows) {
-                    const tr = document.createElement('tr');
-                    const flags = [];
-                    if (row.costUnknown) {
-                        flags.push('{{i18n.view.ui.ai.usage.costUnknown}}');
-                    }
-                    if (row.overQuota) {
-                        flags.push('{{i18n.view.ui.ai.usage.overQuota}}');
-                    }
-                    tr.innerHTML =
-                        '<td></td><td></td><td></td><td></td><td></td><td></td>';
-                    const cells = tr.querySelectorAll('td');
-                    cells[0].textContent = row.subject || '';
-                    cells[1].textContent = row.periodKey || '';
-                    cells[2].textContent = String(row.requests || 0);
-                    cells[3].textContent = String(row.tokens || 0);
-                    cells[4].textContent = row.costUnknown ? '—' : String(row.cost || 0);
-                    cells[5].textContent = flags.join(', ');
-                    body.appendChild(tr);
+                per = button.getAttribute('data-per') === 'month' ? 'month' : 'day';
+                const url = new URL(window.location.href);
+                if (per === 'month') {
+                    url.searchParams.set('per', 'month');
+                } else {
+                    url.searchParams.delete('per');
                 }
-            } catch (error) {
-                status.textContent = error.message || '{{i18n.view.ui.ai.usage.loadError}}';
-            }
+                history.replaceState(null, '', url);
+                load();
+            });
+
+            load();
         });
     </script>
 </body>

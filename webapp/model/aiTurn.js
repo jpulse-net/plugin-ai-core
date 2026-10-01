@@ -3,8 +3,8 @@
  * @tagline         Turn records
  * @description     One user message and everything the agent did in response
  * @file            plugins/ai-core/webapp/model/aiTurn.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -92,12 +92,18 @@ class AiTurnModel {
         return this.getCollection().findOne({ _id: coerceId(id) });
     }
 
+    /**
+     * The newest `limit` turns, oldest of that window first.
+     * An ascending limit would keep the start of a long thread and drop the turn just finished.
+     */
     static async listByThread(threadId, limit = 50) {
-        return this.getCollection()
+        const rows = await this.getCollection()
             .find({ threadId: String(threadId) })
-            .sort({ seq: 1 })
+            .sort({ seq: -1 })
             .limit(limit)
             .toArray();
+        rows.reverse();
+        return rows;
     }
 
     static async requestCancel(id) {
@@ -145,6 +151,34 @@ class AiTurnModel {
         const collection = this.getCollection();
         const result = await collection.deleteMany({ createdAt: { $lt: cutoff } });
         return result.deletedCount || 0;
+    }
+
+    /**
+     * Distinct threads with a turn in the inclusive day range, and failed/stalled turns.
+     * Days are server-local, matching usage records.
+     * @param {string} fromDay
+     * @param {string} toDay
+     * @returns {Promise<{ conversations: number, failedOrStalled: number }>}
+     */
+    static async usageWindow(fromDay, toDay) {
+        const [fy, fm, fd] = String(fromDay).split('-').map(Number);
+        const [ty, tm, td] = String(toDay).split('-').map(Number);
+        const start = new Date(fy, fm - 1, fd);
+        const end = new Date(ty, tm - 1, td + 1);
+        const rows = await this.getCollection().find({
+            createdAt: { $gte: start, $lt: end }
+        }).toArray();
+        const threads = new Set();
+        let failedOrStalled = 0;
+        for (const row of rows) {
+            if (row.threadId) {
+                threads.add(String(row.threadId));
+            }
+            if (row.status === 'failed' || row.status === 'stalled') {
+                failedOrStalled += 1;
+            }
+        }
+        return { conversations: threads.size, failedOrStalled };
     }
 
     /**

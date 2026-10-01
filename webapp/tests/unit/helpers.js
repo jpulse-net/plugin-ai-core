@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Helpers
  * @tagline         In-memory collections and hook fakes
  * @file            plugins/ai-core/webapp/tests/unit/helpers.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -16,23 +16,140 @@ export function matchQuery(doc, query) {
         return true;
     }
     for (const [key, value] of Object.entries(query)) {
-        if (value && typeof value === 'object' && value.$lt) {
-            if (!(doc[key] < value.$lt)) {
-                return false;
+        if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+            let compared = false;
+            if (Array.isArray(value.$in)) {
+                compared = true;
+                if (!value.$in.map((item) => String(item)).includes(String(doc[key]))) {
+                    return false;
+                }
             }
-            continue;
-        }
-        if (value && typeof value === 'object' && Array.isArray(value.$in)) {
-            if (!value.$in.map((item) => String(item)).includes(String(doc[key]))) {
-                return false;
+            if (value.$lt !== undefined) {
+                compared = true;
+                if (!(doc[key] < value.$lt)) {
+                    return false;
+                }
             }
-            continue;
+            if (value.$lte !== undefined) {
+                compared = true;
+                if (!(doc[key] <= value.$lte)) {
+                    return false;
+                }
+            }
+            if (value.$gt !== undefined) {
+                compared = true;
+                if (!(doc[key] > value.$gt)) {
+                    return false;
+                }
+            }
+            if (value.$gte !== undefined) {
+                compared = true;
+                if (!(doc[key] >= value.$gte)) {
+                    return false;
+                }
+            }
+            if (compared) {
+                continue;
+            }
         }
         if (String(doc[key]) !== String(value)) {
             return false;
         }
     }
     return true;
+}
+
+function fieldPath(doc, path) {
+    return String(path).split('.').reduce((cur, part) => (cur == null ? undefined : cur[part]), doc);
+}
+
+function evalExpr(doc, expr) {
+    if (Array.isArray(expr)) {
+        return expr.map((item) => evalExpr(doc, item));
+    }
+    if (expr instanceof Date || expr == null || typeof expr !== 'object') {
+        if (typeof expr === 'string' && expr.startsWith('$')) {
+            return fieldPath(doc, expr.slice(1));
+        }
+        return expr;
+    }
+    if (expr.$substrBytes) {
+        const [field, start, len] = expr.$substrBytes;
+        return String(evalExpr(doc, field) ?? '').slice(start, start + len);
+    }
+    const out = {};
+    for (const [key, value] of Object.entries(expr)) {
+        out[key] = evalExpr(doc, value);
+    }
+    return out;
+}
+
+function applyGroup(rows, spec) {
+    const buckets = new Map();
+    for (const doc of rows) {
+        const id = spec._id == null ? null : evalExpr(doc, spec._id);
+        const key = JSON.stringify(id);
+        let bucket = buckets.get(key);
+        const isFirst = !bucket;
+        if (!bucket) {
+            bucket = { _id: id };
+            buckets.set(key, bucket);
+        }
+        for (const [field, acc] of Object.entries(spec)) {
+            if (field === '_id' || !acc || typeof acc !== 'object') {
+                continue;
+            }
+            if (acc.$sum !== undefined) {
+                bucket[field] = (bucket[field] || 0) + (Number(evalExpr(doc, acc.$sum)) || 0);
+            } else if (acc.$max !== undefined) {
+                const value = evalExpr(doc, acc.$max);
+                if (bucket[field] === undefined || (value != null && value > bucket[field])) {
+                    bucket[field] = value;
+                }
+            } else if (acc.$min !== undefined) {
+                const value = evalExpr(doc, acc.$min);
+                if (bucket[field] === undefined || (value != null && value < bucket[field])) {
+                    bucket[field] = value;
+                }
+            } else if (acc.$first !== undefined && isFirst) {
+                bucket[field] = evalExpr(doc, acc.$first);
+            }
+        }
+    }
+    return [...buckets.values()];
+}
+
+function runPipeline(docs, pipeline) {
+    let rows = docs.map((doc) => ({ ...doc }));
+    for (const stage of pipeline) {
+        if (stage.$match) {
+            rows = rows.filter((doc) => matchQuery(doc, stage.$match));
+        } else if (stage.$sort) {
+            const entries = Object.entries(stage.$sort);
+            rows = [...rows].sort((a, b) => {
+                for (const [field, dir] of entries) {
+                    if (a[field] < b[field]) {
+                        return -dir;
+                    }
+                    if (a[field] > b[field]) {
+                        return dir;
+                    }
+                }
+                return 0;
+            });
+        } else if (stage.$group) {
+            rows = applyGroup(rows, stage.$group);
+        } else if (stage.$facet) {
+            const faceted = {};
+            for (const [name, sub] of Object.entries(stage.$facet)) {
+                faceted[name] = runPipeline(rows, sub);
+            }
+            rows = [faceted];
+        } else {
+            throw new Error('unsupported aggregation stage');
+        }
+    }
+    return rows;
 }
 
 export function memoryCollection(options = {}) {
@@ -145,6 +262,14 @@ export function memoryCollection(options = {}) {
         async findOneAndUpdate(query, update) {
             await this.updateOne(query, update);
             return docs.find(doc => matchQuery(doc, query)) || null;
+        },
+        aggregate(pipeline) {
+            const rows = runPipeline(docs, pipeline);
+            return {
+                async toArray() {
+                    return rows;
+                }
+            };
         },
         async deleteMany(query) {
             const keep = [];

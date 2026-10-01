@@ -3,8 +3,8 @@
  * @tagline         Agent layer public surface
  * @description     Turn loop, quota, lease, prompt, providers — no transport imports
  * @file            plugins/ai-core/webapp/utils/agent/index.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -36,9 +36,10 @@ export {
     firstExceededCap,
     onAiQuotaCheck,
     onAiQuotaSettle,
+    historyRange,
     periodKey,
-    quotaSnapshot,
-    usageDocumentKey
+    periodRange,
+    quotaSnapshot
 } from './quota.js';
 export {
     AI_CONFIG_DEFAULTS,

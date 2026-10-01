@@ -1,10 +1,10 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Agent / Quota
  * @tagline         Named quota dimensions and the shipped period policy
- * @description     Subject is resolved, not assumed; turn-start only, permissive (TD-02)
+ * @description     Username is resolved, not assumed; turn-start only, permissive (TD-02)
  * @file            plugins/ai-core/webapp/utils/agent/quota.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -39,8 +39,39 @@ export function periodKey(period, date = new Date()) {
     throw new Error(`Unknown quota period '${period}'`);
 }
 
-export function usageDocumentKey(subject, period, date) {
-    return `${subject}:${periodKey(period, date)}`;
+/**
+ * Inclusive day-string range for a cap period or the usage page switch.
+ * @param {'day'|'month'|string} period
+ * @param {Date} [now]
+ * @returns {{ fromDay: string, toDay: string }}
+ */
+export function periodRange(period, now = new Date()) {
+    const today = periodKey('day', now);
+    if (period === 'day') {
+        return { fromDay: today, toDay: today };
+    }
+    if (period === 'month') {
+        return { fromDay: `${periodKey('month', now)}-01`, toDay: today };
+    }
+    throw new Error(`Unknown quota period '${period}'`);
+}
+
+/**
+ * History window: 60 days, or 12 months ending this month.
+ * @param {'day'|'month'} per
+ * @param {Date} [now]
+ * @returns {{ fromDay: string, toDay: string }}
+ */
+export function historyRange(per, now = new Date()) {
+    if (per === 'day') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 59);
+        return { fromDay: periodKey('day', start), toDay: periodKey('day', now) };
+    }
+    if (per === 'month') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        return { fromDay: periodKey('day', start), toDay: periodKey('day', now) };
+    }
+    throw new Error(`Unknown quota period '${per}'`);
 }
 
 function readDimension(doc, dimension) {
@@ -82,19 +113,52 @@ export function firstExceededCap(doc, caps) {
     return null;
 }
 
+/**
+ * An explicit caps array, including [], is the decision. DEFAULT_CAPS apply
+ * only when the caller did not pass settings.caps at all.
+ */
 export function defaultQuotaDecision(actor, settings = {}) {
-    const caps = Array.isArray(settings.caps) && settings.caps.length
-        ? settings.caps
-        : DEFAULT_CAPS;
+    const caps = Array.isArray(settings.caps) ? settings.caps : DEFAULT_CAPS;
     return {
-        subject: actor?.username || '',
+        username: actor?.username || '',
         caps
     };
 }
 
+function quotaDoc(totals) {
+    return {
+        requests: totals.requests || 0,
+        reservedRequests: 0,
+        tokens: totals.tokens || 0,
+        cost: totals.cost || 0,
+        costUnknown: totals.costUnknown === true,
+        toolCalls: totals.toolCalls || 0
+    };
+}
+
+function turnIdentity(ctx, username, now) {
+    const thread = ctx.thread || {};
+    return {
+        day: periodKey('day', now),
+        username,
+        provider: ctx.provider || '',
+        model: ctx.model || '',
+        scopeType: thread.scopeType || '',
+        scopeId: thread.scopeId != null && thread.scopeId !== '' ? String(thread.scopeId) : ''
+    };
+}
+
+function settleIdentity(ctx) {
+    const quota = ctx.quota || {};
+    const now = quota.now || ctx.now || new Date();
+    const username = quota.username || quota.identity?.username || ctx.actor?.username || '';
+    const base = quota.identity || turnIdentity(ctx, username, now);
+    return { ...base, username, day: base.day || periodKey('day', now) };
+}
+
 /**
  * Shipped onAiQuotaCheck. Priority 1000 so a site handler at default 100 can replace it
- * by returning { subject, caps }.
+ * by returning { username, caps }.
  */
 export async function onAiQuotaCheck(ctx) {
     const decision = defaultQuotaDecision(ctx.actor, ctx.settings);
@@ -102,9 +166,11 @@ export async function onAiQuotaCheck(ctx) {
     const usageModel = ctx.usageModel || AiUsageModel;
 
     for (const cap of decision.caps) {
-        const key = periodKey(cap.period, now);
-        const doc = await usageModel.getByKey(decision.subject, key);
-        const exceeded = firstExceededCap(doc, [cap]);
+        const totals = await usageModel.sumForUser(
+            decision.username,
+            periodRange(cap.period, now)
+        );
+        const exceeded = firstExceededCap(quotaDoc(totals), [cap]);
         if (exceeded) {
             const err = new Error(
                 exceeded.costUnknown
@@ -117,25 +183,25 @@ export async function onAiQuotaCheck(ctx) {
         }
     }
 
-    const dayKey = periodKey('day', now);
-    await usageModel.reserve(decision.subject, dayKey, { requests: 1 });
+    const identity = turnIdentity(ctx, decision.username, now);
+    await usageModel.reserve(identity, { requests: 1 });
     ctx.quota = {
-        subject: decision.subject,
+        username: decision.username,
         caps: decision.caps,
-        reserved: [{ period: 'day', periodKey: dayKey, requests: 1 }],
+        identity,
+        reserved: { requests: 1 },
         now
     };
     return ctx.quota;
 }
 
 /**
- * Shipped onAiQuotaSettle. Writes daily and monthly documents on every settle.
+ * Shipped onAiQuotaSettle. One write on the reserved identity.
  */
 export async function onAiQuotaSettle(ctx) {
     const quota = ctx.quota || {};
-    const subject = quota.subject || ctx.actor?.username || '';
-    const now = quota.now || ctx.now || new Date();
     const usageModel = ctx.usageModel || AiUsageModel;
+    const identity = settleIdentity(ctx);
     const usage = ctx.usage || {};
     const delta = {
         requests: ctx.started === false ? 0 : 1,
@@ -143,7 +209,8 @@ export async function onAiQuotaSettle(ctx) {
         tokensOut: usage.tokensOut || 0,
         cacheWrite: usage.cacheWrite || 0,
         cacheRead: usage.cacheRead || 0,
-        toolCalls: usage.toolCalls || 0
+        toolCalls: usage.toolCalls || 0,
+        scopeLabel: ctx.scope?.label || ''
     };
     if (usage.cost == null) {
         if (usage.costUnknown === true || ctx.costUnknown === true) {
@@ -155,37 +222,36 @@ export async function onAiQuotaSettle(ctx) {
     }
 
     if (ctx.started === false) {
-        for (const reserved of quota.reserved || []) {
-            await usageModel.rollbackReserve(subject, reserved.periodKey, {
-                requests: reserved.requests || 0
-            });
+        const requests = quota.reserved?.requests || 0;
+        if (requests) {
+            await usageModel.rollbackReserve(identity, { requests });
         }
         return ctx;
     }
 
-    await usageModel.settle(subject, periodKey('day', now), delta);
-    await usageModel.settle(subject, periodKey('month', now), delta);
+    await usageModel.settle(identity, delta);
     return ctx;
 }
 
 /**
- * Snapshot for the capability probe / usage page.
+ * Snapshot for the capability probe.
+ * sumForUser already folds reservations into requests.
  */
-export async function quotaSnapshot(subject, caps, now = new Date(), usageModel = AiUsageModel) {
+export async function quotaSnapshot(username, caps, now = new Date(), usageModel = AiUsageModel) {
     const rows = [];
     for (const cap of caps || DEFAULT_CAPS) {
-        const key = periodKey(cap.period, now);
-        const doc = await usageModel.getByKey(subject, key);
+        const range = periodRange(cap.period, now);
+        const totals = await usageModel.sumForUser(username, range);
         rows.push({
             dimension: cap.dimension,
             period: cap.period,
-            periodKey: key,
+            periodKey: cap.period === 'month' ? periodKey('month', now) : range.fromDay,
             limit: cap.limit,
-            used: readDimension(doc, cap.dimension),
-            costUnknown: doc?.costUnknown === true
+            used: readDimension(quotaDoc(totals), cap.dimension),
+            costUnknown: totals.costUnknown === true
         });
     }
-    return { subject, rows };
+    return { username, rows };
 }
 
 // EOF plugins/ai-core/webapp/utils/agent/quota.js

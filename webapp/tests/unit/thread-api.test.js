@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Thread API
  * @tagline         List surviving stamps and delete leaves usage
  * @file            plugins/ai-core/webapp/tests/unit/thread-api.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -130,13 +130,21 @@ describe('thread API', () => {
             userText: 'hello',
             createdBy: 'jdoe'
         });
-        await AiUsageModel.reserve('jdoe', '2026-09-21', { requests: 1 });
-        await AiUsageModel.settle('jdoe', '2026-09-21', {
+        const usageId = {
+            day: '2026-09-21',
+            username: 'jdoe',
+            provider: '',
+            model: '',
+            scopeType: 'doc',
+            scopeId: 'doc-usage'
+        };
+        await AiUsageModel.reserve(usageId, { requests: 1 });
+        await AiUsageModel.settle(usageId, {
             requests: 1,
             tokensIn: 12,
             tokensOut: 8
         });
-        const before = { ...(await AiUsageModel.getByKey('jdoe', '2026-09-21')) };
+        const before = { ...(await AiUsageModel.findIdentity(usageId)) };
         const res = jsonRes();
         await AiCoreController.apiDeleteThread({
             params: { id: thread._id },
@@ -154,10 +162,21 @@ describe('thread API', () => {
         expect(String(res.body.data.thread._id)).not.toBe(String(thread._id));
         expect(await AiThreadModel.findById(thread._id)).toBeNull();
         expect(await AiTurnModel.listByThread(String(thread._id))).toEqual([]);
-        expect(await AiUsageModel.getByKey('jdoe', '2026-09-21')).toEqual(before);
+        expect(await AiUsageModel.findIdentity(usageId)).toEqual(before);
         expect(before.requests).toBe(1);
         expect(before.tokensIn).toBe(12);
         expect(before.tokensOut).toBe(8);
+    });
+
+    test('lists the newest turns when a thread is longer than the window', async () => {
+        AiTurnModel.useCollection(memoryCollection());
+        const threadId = 'thread-window';
+        for (let seq = 1; seq <= 3; seq += 1) {
+            await AiTurnModel.create({ threadId, seq, userText: `m${seq}` });
+        }
+        const rows = await AiTurnModel.listByThread(threadId, 2);
+        expect(rows.map((row) => row.seq)).toEqual([2, 3]);
+        expect(rows.map((row) => row.userText)).toEqual(['m2', 'm3']);
     });
 });
 

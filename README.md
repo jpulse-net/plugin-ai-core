@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.18
+# jPulse Framework / Plugins / AI Core Plugin v1.0.19
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -56,7 +56,25 @@ See [docs/README.md](docs/README.md).
 
 ## Hooks defined
 
-`onAiProviderRegister`, `onAiComplete`, `onAiToolRegister`, `onAiToolExecute`, `onAiToolData`, `onAiScopeResolve`, `onAiPromptFragment`, `onAiQuotaCheck`, `onAiQuotaSettle`, `onAiTurnBefore`, `onAiTurnAfter`.
+`onAiProviderRegister`, `onAiComplete`, `onAiToolRegister`, `onAiToolExecute`, `onAiToolData`, `onAiScopeResolve`, `onAiScopeTypes`, `onAiPromptFragment`, `onAiQuotaCheck`, `onAiQuotaSettle`, `onAiTurnBefore`, `onAiTurnAfter`.
+
+`onAiQuotaCheck` returns `{ username, caps }`. A handler that charges a pool returns that pool's name as `username`. `onAiScopeTypes` pushes `{ scopeType, label }` for each type the plugin or site owns; plain text, or translated with `ctx.req`. First handler wins.
+
+## Upgrade to 1.0.19
+
+Stop the app first. In mongosh, on the site database:
+
+```js
+db.aiUsage.drop()
+db.configs.updateMany({}, { $rename: {
+    'data.ai.maxRequestsPerDay': 'data.ai.maxUserRequestsPerDay',
+    'data.ai.maxTokensPerDay': 'data.ai.maxUserTokensPerDay'
+} })
+```
+
+Then start 1.0.19. Skipping the drop leaves the old unique index on `key`, and the second new usage record fails, so every AI turn fails at the quota check. Skipping the rename leaves the daily caps at their defaults (200 requests, 400000 tokens). Usage numbers are kept; conversation turns older than `retentionDays` (default 90, `0` keeps them) are deleted once a day.
+
+Caps are per user. `0` means no cap on all three (`maxUserRequestsPerDay`, `maxUserTokensPerDay`, `maxUserCostPerMonth`). The cost cap is whole US dollars for the calendar month in server time. While it is set, a user whose month includes a model with no price entry cannot start new turns. Admin → AI usage has a Day/Month switch (`?per=day|month`).
 
 ## Tests
 
@@ -82,6 +100,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.19**, W-258, 2026-10-01: Usage is one record per day, user, model, and scope. The usage page has a Day/Month switch, cards, and breakdowns by user, model, and scope. Cap settings are `maxUserRequestsPerDay`, `maxUserTokensPerDay`, and `maxUserCostPerMonth` (`0` means no cap). A long conversation keeps the newest turns. A page with one article per section is read whole. A page with almost no text says the content loads dynamically; a failed fetch from the prompt shows that message and does not send the turn. Drop `aiUsage` and rename the two daily cap keys before starting (see Upgrade). `ai-mock` and `hello-ai` lockstep.
 - **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.
 - **1.0.17**, W-252, 2026-09-30: A retryable provider error is logged and not shown until the last attempt fails. A success after a retry shows no error. The WebSocket handler does not send that error a second time. Waits are 2s, 4s, and 10s; a Retry-After header can only shorten a wait. `ai-mock` and `hello-ai` lockstep.
 - **1.0.16**, W-248, 2026-09-22: Hello AI adds Code Examples and Architecture beside the scratch pad. No ai-core product change. `ai-mock` lockstep.

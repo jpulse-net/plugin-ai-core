@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -59,6 +59,53 @@ describe('settings', () => {
         });
         expect(custom.maxConvertBytes).toBe(1048576);
         expect(custom.defaultToolTimeoutMs).toBe(35000);
+    });
+
+    test('app.conf ai section has no effect', () => {
+        const settings = mergeSettings({
+            site: { enabled: true },
+            app: {
+                debugDumps: true,
+                defaultProvider: 'from-app',
+                defaultModel: 'from-app',
+                promptOverride: 'from-app',
+                allowedModels: ['from-app']
+            },
+            plugin: {}
+        });
+        expect(settings.debugDumps).toBe(false);
+        expect(settings.defaultProvider).toBe('');
+        expect(settings.defaultModel).toBe('');
+        expect(settings.siteInstructions).toBe('');
+        expect(settings.allowedModels).toEqual([]);
+    });
+
+    test('per-user caps: missing, zero, negative, positive, and old keys', () => {
+        const missing = mergeSettings({ site: {} });
+        expect(missing.caps).toEqual([
+            { dimension: 'requests', period: 'day', limit: 200 },
+            { dimension: 'tokens', period: 'day', limit: 400000 }
+        ]);
+        const none = mergeSettings({
+            site: { maxUserRequestsPerDay: 0, maxUserTokensPerDay: -1, maxUserCostPerMonth: 0 }
+        });
+        expect(none.caps).toEqual([]);
+        const old = mergeSettings({
+            site: { maxRequestsPerDay: 10, maxTokensPerDay: 10, maxUserCostPerMonth: 25 }
+        });
+        expect(old.caps).toEqual([
+            { dimension: 'requests', period: 'day', limit: 200 },
+            { dimension: 'tokens', period: 'day', limit: 400000 },
+            { dimension: 'cost', period: 'month', limit: 25 }
+        ]);
+        const set = mergeSettings({
+            site: { maxUserRequestsPerDay: 10, maxUserTokensPerDay: 20, maxUserCostPerMonth: 30 }
+        });
+        expect(set.caps).toEqual([
+            { dimension: 'requests', period: 'day', limit: 10 },
+            { dimension: 'tokens', period: 'day', limit: 20 },
+            { dimension: 'cost', period: 'month', limit: 30 }
+        ]);
     });
 
     test('debugDumps stays off without plugin or app.conf flag', () => {

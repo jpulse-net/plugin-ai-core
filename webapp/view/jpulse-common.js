@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -1758,8 +1758,9 @@ if (!window.jPulse) {
         async function fetchUrlSource(url) {
             const res = await jPulse.api.post('/api/1/ai/source/fetch', { url: url });
             if (!res.success) {
-                showToast(res.error || I18N.error, 'error');
-                return null;
+                const message = res.error || I18N.error;
+                showToast(message, 'error');
+                return { error: message };
             }
             return addTextSource(res.data.text, {
                 name: res.data.name,
@@ -2536,6 +2537,17 @@ if (!window.jPulse) {
             }));
         }
 
+        function formatQuotaCost(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) {
+                return '—';
+            }
+            if (n !== 0 && Math.abs(n) < 0.01) {
+                return n < 0 ? '-<$0.01' : '<$0.01';
+            }
+            return '$' + n.toFixed(2);
+        }
+
         function runQuota() {
             const quota = state.capability && state.capability.quota;
             const rows = quota && quota.rows;
@@ -2543,8 +2555,9 @@ if (!window.jPulse) {
                 return I18N.slashQuotaNone;
             }
             return rows.map((row) => {
-                const used = row.used == null ? '—' : row.used;
-                const limit = row.limit == null ? '—' : row.limit;
+                const money = row.dimension === 'cost';
+                const used = row.used == null ? '—' : (money ? formatQuotaCost(row.used) : row.used);
+                const limit = row.limit == null ? '—' : (money ? formatQuotaCost(row.limit) : row.limit);
                 let line = `${row.dimension} (${row.period}): ${used} / ${limit}`;
                 if (row.dimension === 'cost' && row.costUnknown) {
                     line += ` (${I18N.slashCostUnknown})`;
@@ -3433,7 +3446,14 @@ if (!window.jPulse) {
                     const pending = state.intercept;
                     hideIntercept();
                     if (pending) {
-                        await fetchUrlSource(pending.url);
+                        const added = await fetchUrlSource(pending.url);
+                        if (!added || added.error) {
+                            els.input.value = pending.text;
+                            if (added && added.error) {
+                                await appendLocal(pending.text, added.error);
+                            }
+                            return;
+                        }
                         await sendText(pending.text);
                     }
                     return;

@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Attachments
  * @tagline         Sources, ingest, convert, images, and loop purity
  * @file            plugins/ai-core/webapp/tests/unit/attachments.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -296,6 +296,18 @@ describe('ingest', () => {
         expect(extracted.text).not.toContain('alert');
         expect(extracted.text).not.toContain('color:red');
         expect(extracted.text).not.toContain('Menu');
+    });
+
+    test('several article sections inside main are kept together', () => {
+        const html = [
+            '<html><head><title>Charter</title></head><body>',
+            '<main><article><p>We the People.</p></article>',
+            '<article><h5>Section 1</h5><p>All legislative Powers herein granted.</p></article>',
+            '</main></body></html>'
+        ].join('');
+        const extracted = extractHtmlText(html);
+        expect(extracted.text).toContain('We the People.');
+        expect(extracted.text).toContain('All legislative Powers herein granted.');
     });
 
     test('empty-shell verdict and provenance', () => {

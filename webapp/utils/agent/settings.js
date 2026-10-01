@@ -1,10 +1,10 @@
 /**
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Agent / Settings
  * @tagline         Effective AI settings
- * @description     Site config tab, optional app.conf.ai, and plugin debug flag
+ * @description     Site config tab and plugin debug flag; code defaults then MongoDB
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -28,8 +28,9 @@ export const AI_CONFIG_DEFAULTS = {
     defaultProvider: '',
     defaultModel: '',
     allowedModels: [],
-    maxRequestsPerDay: 200,
-    maxTokensPerDay: 400000,
+    maxUserRequestsPerDay: 200,
+    maxUserTokensPerDay: 400000,
+    maxUserCostPerMonth: 0,
     maxRoundsPerTurn: 8,
     turnTimeoutMs: 120000,
     retryWaitMs: DEFAULT_RETRY_WAIT_MS.slice(),
@@ -122,31 +123,53 @@ export function getCachedSettings() {
  * @param {object} [sources]
  * @returns {object}
  */
+/**
+ * Missing uses the code default. A finite number above 0 is the cap.
+ * 0 or negative is no cap. The old maxRequestsPerDay / maxTokensPerDay keys are ignored.
+ * @param {*} value
+ * @param {number|null} fallback
+ * @returns {number|null}
+ */
+function positiveCap(value, fallback) {
+    const raw = (value === undefined || value === null || value === '') ? fallback : Number(value);
+    if (!Number.isFinite(raw) || raw <= 0) {
+        return null;
+    }
+    return raw;
+}
+
+function capsFromSite(site) {
+    const caps = [];
+    const requests = positiveCap(site.maxUserRequestsPerDay, AI_CONFIG_DEFAULTS.maxUserRequestsPerDay);
+    const tokens = positiveCap(site.maxUserTokensPerDay, AI_CONFIG_DEFAULTS.maxUserTokensPerDay);
+    const cost = positiveCap(site.maxUserCostPerMonth, AI_CONFIG_DEFAULTS.maxUserCostPerMonth);
+    if (requests != null) {
+        caps.push({ dimension: 'requests', period: 'day', limit: requests });
+    }
+    if (tokens != null) {
+        caps.push({ dimension: 'tokens', period: 'day', limit: tokens });
+    }
+    if (cost != null) {
+        caps.push({ dimension: 'cost', period: 'month', limit: cost });
+    }
+    return caps;
+}
+
 export function mergeSettings(sources = {}) {
     const site = sources.site || {};
-    const app = sources.app || {};
     const plugin = sources.plugin || {};
-    const allowedModels = asArray(site.allowedModels ?? app.allowedModels);
+    const allowedModels = asArray(site.allowedModels);
     const disabledTools = asArray(site.disabledTools);
     const reviewedTools = asArray(site.reviewedTools);
-    const maxRequests = Number.isFinite(site.maxRequestsPerDay)
-        ? site.maxRequestsPerDay
-        : AI_CONFIG_DEFAULTS.maxRequestsPerDay;
-    const maxTokens = Number.isFinite(site.maxTokensPerDay)
-        ? site.maxTokensPerDay
-        : AI_CONFIG_DEFAULTS.maxTokensPerDay;
     return {
         enabled: site.enabled !== false,
         allowedRoles: asArray(site.allowedRoles).length
             ? asArray(site.allowedRoles)
             : AI_CONFIG_DEFAULTS.allowedRoles,
-        defaultProvider: site.defaultProvider || app.defaultProvider || '',
-        defaultModel: site.defaultModel || app.defaultModel || '',
+        defaultProvider: site.defaultProvider || '',
+        defaultModel: site.defaultModel || '',
         allowedModels,
-        caps: [
-            { dimension: 'requests', period: 'day', limit: maxRequests },
-            { dimension: 'tokens', period: 'day', limit: maxTokens }
-        ],
+        caps: capsFromSite(site),
         maxRoundsPerTurn: Number.isFinite(site.maxRoundsPerTurn)
             ? site.maxRoundsPerTurn
             : AI_CONFIG_DEFAULTS.maxRoundsPerTurn,
@@ -171,8 +194,8 @@ export function mergeSettings(sources = {}) {
             ? site.retentionDays
             : AI_CONFIG_DEFAULTS.retentionDays,
         autoTitle: site.autoTitle !== false,
-        siteInstructions: site.siteInstructions || app.promptOverride || '',
-        debugDumps: plugin.debugDumps === true || app.debugDumps === true,
+        siteInstructions: site.siteInstructions || '',
+        debugDumps: plugin.debugDumps === true,
         maxSourceReadsPerTurn: Number.isFinite(site.maxSourceReadsPerTurn)
             ? site.maxSourceReadsPerTurn
             : AI_CONFIG_DEFAULTS.maxSourceReadsPerTurn,
@@ -271,11 +294,7 @@ export async function loadSettings(deps = {}) {
     } catch {
         plugin = {};
     }
-    const merged = mergeSettings({
-        site,
-        app: deps.app || global.appConfig?.ai || {},
-        plugin
-    });
+    const merged = mergeSettings({ site, plugin });
     return cacheSettings(merged);
 }
 

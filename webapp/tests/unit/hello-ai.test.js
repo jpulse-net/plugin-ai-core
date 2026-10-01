@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Hello AI
  * @tagline         Write path, mock sequence, slash catalog, panel scan
  * @file            plugins/ai-core/webapp/tests/unit/hello-ai.test.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,6 +14,7 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
+import HelloAiController from '../../../../hello-ai/webapp/controller/helloAi.js';
 import AiMockController, {
     lastToolResults,
     priorFromRows,
@@ -397,6 +398,14 @@ describe('adapter contract scan', () => {
         expect(helloView).not.toMatch(/resetOnTitleDblclick/);
         expect(helloView).not.toMatch(/adapter\.attach/);
         expect(helloView).not.toMatch(/mobile:/);
+    });
+});
+
+describe('hello-ai scope type label', () => {
+    test('onAiScopeTypes names hello-ai', async () => {
+        const ctx = { scopeTypes: [] };
+        await HelloAiController.onAiScopeTypes(ctx);
+        expect(ctx.scopeTypes).toEqual([{ scopeType: 'hello-ai', label: 'Hello AI' }]);
     });
 });
 

@@ -3,8 +3,8 @@
  * @tagline         Readability-lite HTML to markdown
  * @description     No DOM library; empty-shell verdict for client-rendered pages
  * @file            plugins/ai-core/webapp/utils/attachments/html.js
- * @version         1.0.18
- * @release         2026-09-30
+ * @version         1.0.19
+ * @release         2026-10-01
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -14,7 +14,7 @@
 
 export const EMPTY_SHELL_MIN_CHARS = 500;
 export const EMPTY_SHELL_MAX_RATIO = 0.02;
-export const EMPTY_SHELL_MESSAGE = 'That page has almost no text. Paste the article instead.';
+export const EMPTY_SHELL_MESSAGE = 'We couldn\'t read this webpage because its content loads dynamically. Please copy and paste the text directly, or add it as a file.';
 
 const DISCARD_TAGS = ['script', 'style', 'noscript', 'svg', 'template', 'iframe'];
 const CHROME_TAGS = ['nav', 'header', 'footer', 'aside', 'form'];
@@ -166,6 +166,12 @@ export function decodeEntities(text) {
         });
 }
 
+function readableText(html) {
+    let cleaned = removeElements(html, CHROME_TAGS);
+    cleaned = removeMatchingElements(cleaned, (_tag, attrs) => isChromeAttrs(attrs));
+    return toMarkdown(cleaned);
+}
+
 function toMarkdown(html) {
     let out = String(html || '');
     out = out.replace(/<br\s*\/?>/gi, '\n');
@@ -197,16 +203,22 @@ export function extractHtmlText(html) {
     let body = String(html || '');
     body = body.replace(/<!--[\s\S]*?-->/g, '');
     body = removeElements(body, DISCARD_TAGS);
-    const main = extractFirst(body, 'article')
-        || extractFirst(body, 'main')
-        || extractByRole(body, 'main')
-        || extractFirst(body, 'body')
-        || body;
-    let cleaned = removeElements(main, CHROME_TAGS);
-    cleaned = removeMatchingElements(cleaned, (_tag, attrs) => isChromeAttrs(attrs));
-    const text = toMarkdown(cleaned);
+    const article = extractFirst(body, 'article');
+    const main = extractFirst(body, 'main') || extractByRole(body, 'main');
+    const page = extractFirst(body, 'body') || body;
+    // A page may use one <article> per section. The first one is then a preface,
+    // and <main> holds the rest. Keep the first article only when it is the longer text.
+    let region = page;
+    if (main) {
+        region = main;
+    }
+    if (article) {
+        const articleText = readableText(article);
+        const widerText = readableText(region);
+        region = widerText.length > articleText.length ? region : article;
+    }
     return {
-        text,
+        text: readableText(region),
         name: extractTitle(html)
     };
 }
