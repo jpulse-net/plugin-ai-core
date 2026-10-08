@@ -4,8 +4,8 @@
  * @tagline         AI Core plugin overview
  * @description     Dashboard card and overview for the AI agent server core
  * @file            plugins/ai-core/webapp/view/jpulse-plugins/ai-core.shtml
- * @version         1.0.19
- * @release         2026-10-01
+ * @version         1.0.20
+ * @release         2026-10-08
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -135,7 +135,7 @@
             <p>A site registers scope and tools through hooks. This plugin runs turns, enforces authorization and quota, and streams replies over HTTP or a per-thread WebSocket when a client-host tool is offered.</p>
             <ul class="local-help-links">
                 <li><a href="/hello-ai/">Hello AI</a> — bundled sample plugin, scratch-pad demo, no API key</li>
-                <li><a href="/admin/config.shtml">Site Configuration → AI Agent</a></li>
+                <li><a href="/admin/config.shtml#ai-tab">Site Configuration → AI Agent</a></li>
                 <li><a href="/admin/ai-usage.shtml">AI usage</a></li>
                 <li><a href="/admin/plugin-config.shtml?plugin=ai-core">AI Core configuration</a></li>
                 <li><a href="/admin/plugins.shtml">Plugin management</a></li>

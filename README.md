@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.19
+# jPulse Framework / Plugins / AI Core Plugin v1.0.20
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -10,7 +10,7 @@ Requires jPulse Framework >= 2.0.8 (`logDebug` for prompt/response dumps; `jPuls
 npx jpulse plugin install @jpulse-net/plugin-ai-core
 ```
 
-That one command installs `ai-core`, `ai-mock`, and `hello-ai`. All three have `autoEnable: true`. Set the master switch, roles, and quota on Site Configuration → AI Agent. Usage is Admin → AI usage. Plugin-local settings (including debug dumps, off by default) are on Admin → Plugins → ai-core. Prompt/response dumps print only when that setting is on **and** the host `aiCore` debug area is enabled. Live capability is `/jpulse-plugins/ai-core.shtml`. Open `/hello-ai/` to confirm the install (no API key). Disable the Hello AI plugin to hide that demo without turning off AI. The panel remembers the last-open thread per user; it does not reopen another person's conversation from a shared browser.
+That one command installs `ai-core`, `ai-mock`, and `hello-ai`. All three have `autoEnable: true`. Set the master switch, roles, and quota on [Site Configuration → AI Agent](/admin/config.shtml#ai-tab). Usage is Admin → AI usage. Plugin-local settings (including debug dumps, off by default) are on Admin → Plugins → ai-core. Prompt/response dumps print only when that setting is on **and** the host `aiCore` debug area is enabled. Live capability is `/jpulse-plugins/ai-core.shtml`. Open `/hello-ai/` to confirm the install (no API key). Disable the Hello AI plugin to hide that demo without turning off AI. The panel remembers the last-open thread per user; it does not reopen another person's conversation from a shared browser.
 
 `ai-core` is the **primary**. It names `ai-mock` and `hello-ai` in `bundle.members`. All three share `@jpulse-net/plugin-ai-core`. The bump-version file list lives only here. Companions have no `webapp/bump-version.conf`, and their `package.json` is a publish guard only — staging strips it from the packaged copy.
 
@@ -100,6 +100,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.20**, W-264, 2026-10-08: Links to Site Configuration → AI Agent open that tab (`/admin/config.shtml#ai-tab`). The usage page Day/Month switch lines up with the settings button. The empty-usage sentence above the cards is gone; empty tables still say so. A host that is not allowed names that same address. Requires jPulse Framework >= 2.0.12. `ai-mock` and `hello-ai` lockstep.
 - **1.0.19**, W-258, 2026-10-01: Usage is one record per day, user, model, and scope. The usage page has a Day/Month switch, cards, and breakdowns by user, model, and scope. Cap settings are `maxUserRequestsPerDay`, `maxUserTokensPerDay`, and `maxUserCostPerMonth` (`0` means no cap). A long conversation keeps the newest turns. A page with one article per section is read whole. A page with almost no text says the content loads dynamically; a failed fetch from the prompt shows that message and does not send the turn. Drop `aiUsage` and rename the two daily cap keys before starting (see Upgrade). `ai-mock` and `hello-ai` lockstep.
 - **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.
 - **1.0.17**, W-252, 2026-09-30: A retryable provider error is logged and not shown until the last attempt fails. A success after a retry shows no error. The WebSocket handler does not send that error a second time. Waits are 2s, 4s, and 10s; a Retry-After header can only shorten a wait. `ai-mock` and `hello-ai` lockstep.

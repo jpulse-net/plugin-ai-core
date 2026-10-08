@@ -4,8 +4,8 @@
  * @tagline         AI usage by user, model, and scope
  * @description     Day or month view with cards, breakdowns, and history
  * @file            plugins/ai-core/webapp/view/admin/ai-usage.shtml
- * @version         1.0.19
- * @release         2026-10-01
+ * @version         1.0.20
+ * @release         2026-10-08
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -23,6 +23,18 @@
             display: flex;
             gap: 12px;
             align-items: center;
+        }
+        /* .jp-btn-group's 20px vertical margin and .jp-page-header a's
+           font-size / margin-bottom otherwise sit this row off-center. */
+        .local-ai-usage-actions .jp-btn-group {
+            margin: 0;
+            gap: 12px;
+        }
+        .local-ai-usage-actions .jp-btn {
+            margin: 0;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.4;
         }
         .local-ai-usage-warn {
             color: var(--jp-theme-color-warning-text);
@@ -52,7 +64,7 @@
                     <button type="button" class="jp-btn" data-per="day">{{i18n.view.ui.ai.usage.day}}</button>
                     <button type="button" class="jp-btn" data-per="month">{{i18n.view.ui.ai.usage.month}}</button>
                 </div>
-                <a class="jp-btn" href="/admin/config.shtml">{{i18n.view.ui.ai.usage.settings}}</a>
+                <a class="jp-btn" href="/admin/config.shtml#ai-tab">{{i18n.view.ui.ai.usage.settings}}</a>
             </div>
         </div>
         <div id="ai-usage-status" class="jp-muted"></div>
@@ -234,7 +246,7 @@
 
             function render(data) {
                 const month = data.per === 'month';
-                const empty = month ? I18N.emptyMonth : I18N.emptyToday;
+                status.textContent = '';
                 cards.textContent = '';
                 const cardRows = [
                     [month ? I18N.requestsMonth : I18N.requestsToday, String(data.cards.requests || 0)],
@@ -311,11 +323,6 @@
                         textCell(formatTokens(row.tokens), String(row.tokens || 0)),
                         costCell(row)
                     ]));
-                if (!(data.byUser || []).length && !(data.byModel || []).length) {
-                    status.textContent = empty;
-                } else {
-                    status.textContent = '';
-                }
             }
 
             function markPer() {

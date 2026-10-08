@@ -3,8 +3,8 @@
  * @tagline         Declarative per-turn budgets and argument dedupe
  * @description     Generic counters and argument-identical deduplication
  * @file            plugins/ai-core/webapp/utils/tools/budgets.js
- * @version         1.0.19
- * @release         2026-10-01
+ * @version         1.0.20
+ * @release         2026-10-08
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/

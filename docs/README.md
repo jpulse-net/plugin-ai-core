@@ -1,4 +1,4 @@
-# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.19
+# jPulse Docs / Installed Plugins / AI Core Plugin v1.0.20
 
 A jPulse site gets an agent by configuring one rather than building one. Framework orientation (install, configure, what is possible): [AI Agent](/jpulse-docs/ai-agent).
 
@@ -6,7 +6,7 @@ Prompt and response debug dumps need both the plugin `debugDumps` setting and th
 
 ## The simple case
 
-Install the bundle (its three members auto-enable), then a provider. Pick settings on Site Configuration → AI Agent:
+Install the bundle (its three members auto-enable), then a provider. Pick settings on [Site Configuration → AI Agent](/admin/config.shtml#ai-tab):
 
 ```
 npx jpulse plugin install @jpulse-net/plugin-ai-core
@@ -92,7 +92,7 @@ Everything but `name`, `description`, and `schema` has a default.
 | `requires` | `null` | Named capability, e.g. `scope:read` |
 | `mutates` | `false` | A flag. Direct writes are not propose/apply |
 | `proposes` | `false` | This call creates an Apply card. The call itself writes nothing |
-| `timeoutMs` | site default | Omit to use Site Configuration → AI Agent `defaultToolTimeoutMs` (10000). Set only when this tool needs a different budget |
+| `timeoutMs` | site default | Omit to use [Site Configuration → AI Agent](/admin/config.shtml#ai-tab) `defaultToolTimeoutMs` (10000). Set only when this tool needs a different budget |
 | `group` | `read` | Admin policy grouping |
 | `budget` | `null` | `{ key, max, countWhen, overMessage, overHint }` |
 | `dedupeArgs` | `false` | Argument-identical calls in one turn are rejected |
@@ -209,7 +209,7 @@ A successful result carries `data.proposal = { kind, payload, preview }`. `kind`
 
 Cap and duplicate refusal are declarations on the tool (`budget` and `dedupeArgs`), not a separate setting. Several proposing calls in one turn each get their own card; every pending card stays applyable (Apply all runs them in order).
 
-The false-claim guard is a phrase list on Site Configuration → AI Agent. Each line is a plain phrase or `/regex/flags`. A reply that matches, in a turn that offered a proposing tool and created no card, gets a note in the panel and a history note on the next prompt. Stored reply text is never rewritten. A read-only agent that registers no proposing tool never sees a record, a card, or a note.
+The false-claim guard is a phrase list on [Site Configuration → AI Agent](/admin/config.shtml#ai-tab). Each line is a plain phrase or `/regex/flags`. A reply that matches, in a turn that offered a proposing tool and created no card, gets a note in the panel and a history note on the next prompt. Stored reply text is never rewritten. A read-only agent that registers no proposing tool never sees a record, a card, or a note.
 
 Use a direct `mutates: true` write when the user is looking at the change and can undo it by hand. Use propose/apply when the change needs consent first.
 
@@ -223,7 +223,7 @@ Sources stay on this tab and this conversation. A reload clears the chips. What 
 
 The model never sees source text in the prompt. It sees a metadata manifest **on this turn's user message** and reads through `list_sources` / `get_source` — outline first, then a section or a character window. Filenames in earlier replies are stale. Text comes back inside `<<<SOURCE …>>>` markers. The safety fragment already calls that a quotation, not a request.
 
-URL ingest is `POST /api/1/ai/source/fetch` on the framework `UrlFetch` helper. Host, size, and timeout caps are on Site Configuration → AI Agent. A URL in the compose box offers to fetch it before the turn starts. The offer is hidden when the prompt is a question about the link rather than a request to read it. There is no agent-callable fetch. A listed URL is already ingested — the model reads that copy; it cannot fetch the live web. If the fetch fails, the address stays in the box, the turn is not sent, and the chat shows the same message as the Add URL error toast. After a reload, chips are gone; ask the user to attach the file or URL again.
+URL ingest is `POST /api/1/ai/source/fetch` on the framework `UrlFetch` helper. Host, size, and timeout caps are on [Site Configuration → AI Agent](/admin/config.shtml#ai-tab). A URL in the compose box offers to fetch it before the turn starts. The offer is hidden when the prompt is a question about the link rather than a request to read it. There is no agent-callable fetch. A listed URL is already ingested — the model reads that copy; it cannot fetch the live web. If the fetch fails, the address stays in the box, the turn is not sent, and the chat shows the same message as the Add URL error toast. After a reload, chips are gone; ask the user to attach the file or URL again.
 
 Document conversion is `POST /api/1/ai/source/convert`, a streaming route (`bodyMode: 'stream'`). The plugin calls `onDocumentConvertRegister` / `onDocumentConvert` and does not define them. A PDF drop on a bare install is a clean refusal naming what to install. Production nginx can buffer the whole body if the streaming location is not enabled; the route still works, with `client_max_body_size` as the outer gate.
 
@@ -247,7 +247,7 @@ What a site adds through `onAiPromptFragment` is domain steering — where to pu
 
 ## Admin
 
-Site Configuration → AI Agent holds the master switch, roles, models, per-user quota (`maxUserRequestsPerDay`, `maxUserTokensPerDay`, `maxUserCostPerMonth`; `0` means no cap; the cost cap is whole US dollars for the calendar month, server time), loop limits (including the default tool timeout and the retry schedule: retry waits, default `2000, 4000, 10000` ms, empty for no retries, and the Retry-After cap, default 30000 ms), tool policy, retention (turns only; usage numbers are kept), auto-title, site instructions, the false-claim phrase list, and the source / URL / convert / image caps. While the cost cap is set, a month that includes a model with no price entry refuses new turns for that user. Admin → AI usage is `GET /api/1/ai/usage?per=day|month`: cards, by user, by provider/model, an adaptive scope table, and history. A scope type is named by `onAiScopeTypes` (`{ scopeType, label }`, plain text or translated). `/quota` prints a cost row as `$used / $limit`. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core. There is no `app.conf` `ai` section.
+[Site Configuration → AI Agent](/admin/config.shtml#ai-tab) holds the master switch, roles, models, per-user quota (`maxUserRequestsPerDay`, `maxUserTokensPerDay`, `maxUserCostPerMonth`; `0` means no cap; the cost cap is whole US dollars for the calendar month, server time), loop limits (including the default tool timeout and the retry schedule: retry waits, default `2000, 4000, 10000` ms, empty for no retries, and the Retry-After cap, default 30000 ms), tool policy, retention (turns only; usage numbers are kept), auto-title, site instructions, the false-claim phrase list, and the source / URL / convert / image caps. While the cost cap is set, a month that includes a model with no price entry refuses new turns for that user. Admin → AI usage is `GET /api/1/ai/usage?per=day|month`: cards, by user, by provider/model, an adaptive scope table, and history. A scope type is named by `onAiScopeTypes` (`{ scopeType, label }`, plain text or translated). `/quota` prints a cost row as `$used / $limit`. `/jpulse-plugins/ai-core.shtml` shows the live capability probe. Debug dumps stay on Admin → Plugins → ai-core. There is no `app.conf` `ai` section.
 
 ## Upgrade to 1.0.19
 
@@ -255,6 +255,7 @@ Stop the app. In mongosh, on the site database, run `db.aiUsage.drop()` and rena
 
 ## Plugin releases
 
+- **1.0.20**, W-264, 2026-10-08: Links to Site Configuration → AI Agent open that tab (`/admin/config.shtml#ai-tab`). The usage page Day/Month switch lines up with the settings button. The empty-usage sentence above the cards is gone; empty tables still say so. A host that is not allowed names that same address. Requires jPulse Framework >= 2.0.12. `ai-mock` and `hello-ai` lockstep.
 - **1.0.19**, W-258, 2026-10-01: Usage is one record per day, user, model, and scope. The usage page has a Day/Month switch, cards, and breakdowns by user, model, and scope. Cap settings are `maxUserRequestsPerDay`, `maxUserTokensPerDay`, and `maxUserCostPerMonth` (`0` means no cap). A long conversation keeps the newest turns. A page with one article per section is read whole. A page with almost no text says the content loads dynamically; a failed fetch from the prompt shows that message and does not send the turn. Drop `aiUsage` and rename the two daily cap keys before starting (see Upgrade). `ai-mock` and `hello-ai` lockstep.
 - **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.
 - **1.0.17**, W-252, 2026-09-30: A retryable provider error is logged and not shown until the last attempt fails. A success after a retry shows no error. The WebSocket handler does not send that error a second time. Waits are 2s, 4s, and 10s; a Retry-After header can only shorten a wait. Install lines name OpenAI and Google beside Anthropic. `ai-mock` and `hello-ai` lockstep.

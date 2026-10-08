@@ -3,8 +3,8 @@
  * @tagline         UrlFetch result mapping and provenance
  * @description     Content-type handling, empty-shell, and per-code messages
  * @file            plugins/ai-core/webapp/utils/attachments/ingest.js
- * @version         1.0.19
- * @release         2026-10-01
+ * @version         1.0.20
+ * @release         2026-10-08
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -59,7 +59,7 @@ export function clientFetchMessage(result) {
         case 'CREDENTIALS_IN_URL':
             return 'Embedded credentials in the URL are not allowed.';
         case 'HOST_NOT_ALLOWED':
-            return `Host not allowed${host ? `: ${host}` : ''}. An administrator can add it on Site Configuration → AI Agent.`;
+            return `Host not allowed${host ? `: ${host}` : ''}. An administrator can add it on Site Configuration → AI Agent (/admin/config.shtml#ai-tab).`;
         case 'HOST_BLOCKED':
             return `Host blocked${host ? `: ${host}` : ''}.`;
         case 'PRIVATE_ADDRESS':
