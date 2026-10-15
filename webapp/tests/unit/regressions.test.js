@@ -2,13 +2,13 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Regressions
  * @tagline         1.0.8 and 1.0.9 product contracts that closed BubbleMap bugs
  * @file            plugins/ai-core/webapp/tests/unit/regressions.test.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { describe, expect, test } from '@jest/globals';
@@ -704,6 +704,21 @@ describe('1.0.12 /sources footer counts both families', () => {
         expect(enConf).toMatch(/imagesCap:\s*'Images'/);
         expect(deConf).toMatch(/sourcesCap:\s*'Quellen: %USED% von maximal %MAX%'/);
         expect(deConf).toMatch(/imagesCap:\s*'Bilder'/);
+    });
+});
+
+describe('turn errors stay in the panel', () => {
+    test('an error event is also an ephemeral line, dropped when the turn already shows it', () => {
+        expect(panel).toMatch(/function noteEphemeral\(message\)/);
+        expect(panel).toMatch(/noteEphemeral\(message\)/);
+        expect(panel).toMatch(/ephemeral: true/);
+        expect(panel).toMatch(/function dropShownEphemeral\(\)/);
+        expect(panel).toMatch(/dropShownEphemeral\(\)/);
+        expect(panel).toMatch(/plg-ai-ephemeral/);
+        expect(panel).toMatch(/refreshThreads\(\)\.then\(\(\) => openThread\(state\.threadId, \{ keepLocals: true \}\)/);
+        expect(css).toMatch(/\.plg-ai-agent\.plg-ai-ephemeral/);
+        expect(css).toMatch(/var\(--jp-theme-color-danger\)/);
+        expect(css).toMatch(/var\(--jp-theme-color-danger-bg\)/);
     });
 });
 

@@ -3,13 +3,13 @@
  * @tagline         UrlFetch result mapping and provenance
  * @description     Content-type handling, empty-shell, and per-code messages
  * @file            plugins/ai-core/webapp/utils/attachments/ingest.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import crypto from 'crypto';
@@ -59,13 +59,13 @@ export function clientFetchMessage(result) {
         case 'CREDENTIALS_IN_URL':
             return 'Embedded credentials in the URL are not allowed.';
         case 'HOST_NOT_ALLOWED':
-            return `Host not allowed${host ? `: ${host}` : ''}. An administrator can add it on Site Configuration → AI Agent (/admin/config.shtml#ai-tab).`;
+            return `Host not allowed${host ? `: ${host}` : ''}. You can contact a site admin for details.`;
         case 'HOST_BLOCKED':
             return `Host blocked${host ? `: ${host}` : ''}.`;
         case 'PRIVATE_ADDRESS':
             return 'Private or non-public addresses cannot be fetched.';
         case 'RESPONSE_TOO_LARGE':
-            return 'The page is over the URL size cap.';
+            return 'The page is over the URL size limit. You can contact a site admin for details.';
         case 'CONTENT_TYPE_NOT_ALLOWED':
             return `Unsupported type${type ? ` ${type}` : ''}. Add a page of text, markdown, CSV, or HTML.`;
         case 'REQUEST_TIMEOUT':

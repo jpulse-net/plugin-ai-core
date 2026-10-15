@@ -2,13 +2,13 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
@@ -83,6 +83,43 @@ afterEach(() => {
 });
 
 describe('turn loop', () => {
+    test('max rounds names the cap and who can raise it', async () => {
+        const thread = await seedThread();
+        const errors = [];
+        const result = await runTurn({
+            actor: testActor(),
+            thread,
+            userText: 'keep going',
+            script: {
+                type: 'tool',
+                steps: [
+                    { name: 'get_outline' },
+                    { name: 'get_outline' },
+                    { name: 'get_outline' },
+                    { name: 'get_outline' },
+                    { name: 'get_outline' }
+                ]
+            },
+            settings,
+            hookManager: hooksWith(),
+            threadModel: AiThreadModel,
+            turnModel: AiTurnModel,
+            usageModel: AiUsageModel,
+            redisManager: { isRedisAvailable: () => false },
+            sink: (event) => {
+                if (event.type === 'error') {
+                    errors.push(event);
+                }
+            }
+        });
+        expect(result.status).toBe('failed');
+        expect(errors).toEqual([{
+            type: 'error',
+            code: 'AI_MAX_ROUNDS',
+            message: 'Stopped after 4 rounds. The agent used every tool round before it finished. You can contact a site admin for details.'
+        }]);
+    });
+
     test('rounds to completion', async () => {
         const thread = await seedThread();
         const result = await runTurn({
@@ -359,7 +396,7 @@ describe('turn loop', () => {
             turnModel: AiTurnModel,
             usageModel: AiUsageModel,
             redisManager: { isRedisAvailable: () => false }
-        })).rejects.toThrow(/timed out/i);
+        })).rejects.toThrow(/contact a site admin for details/);
     }, 10000);
 
     test('lease refusal rolls back the reservation', async () => {

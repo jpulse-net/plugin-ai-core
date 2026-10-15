@@ -3,13 +3,13 @@
  * @tagline         Effective AI settings
  * @description     Site config tab and plugin debug flag; code defaults then MongoDB
  * @file            plugins/ai-core/webapp/utils/agent/settings.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { DEFAULT_CLAIM_PHRASES } from '../proposals/index.js';
@@ -21,6 +21,19 @@ export const DEFAULT_RETRY_WAIT_MS = Object.freeze([2000, 4000, 10000]);
 export const DEFAULT_RETRY_AFTER_CAP_MS = 30000;
 export const RETRY_WAIT_MAX_MS = 60000;
 export const RETRY_WAIT_MAX_ENTRIES = 5;
+
+/**
+ * Site Config has not saved Max rounds per turn yet. app.conf is the
+ * new-deployment value. A saved number, including 8, still wins.
+ * @returns {number|null}
+ */
+export function appConfMaxRounds() {
+    const value = global.appConfig?.controller?.aiAgent?.maxRoundsPerTurn;
+    if (Number.isFinite(value) && value > 0) {
+        return value;
+    }
+    return null;
+}
 
 export const AI_CONFIG_DEFAULTS = {
     enabled: true,
@@ -172,7 +185,7 @@ export function mergeSettings(sources = {}) {
         caps: capsFromSite(site),
         maxRoundsPerTurn: Number.isFinite(site.maxRoundsPerTurn)
             ? site.maxRoundsPerTurn
-            : AI_CONFIG_DEFAULTS.maxRoundsPerTurn,
+            : (appConfMaxRounds() ?? AI_CONFIG_DEFAULTS.maxRoundsPerTurn),
         turnTimeoutMs: Number.isFinite(site.turnTimeoutMs)
             ? site.turnTimeoutMs
             : AI_CONFIG_DEFAULTS.turnTimeoutMs,

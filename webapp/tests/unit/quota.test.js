@@ -2,13 +2,13 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Quota
  * @tagline         Dimensions, turn-start enforcement, costUnknown, replaceable policy
  * @file            plugins/ai-core/webapp/tests/unit/quota.test.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { describe, expect, test } from '@jest/globals';
@@ -184,7 +184,7 @@ describe('quota', () => {
             thread: { scopeType: 'map', scopeId: 's3' },
             provider: 'anthropic',
             model: 'c'
-        })).rejects.toMatchObject({ code: 'AI_QUOTA_EXCEEDED' });
+        })).rejects.toThrow(/Monthly request cap of 3 is reached/);
     });
 
     test('quotaSnapshot returns username and rows', async () => {

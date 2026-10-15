@@ -3,13 +3,13 @@
  * @tagline         Named quota dimensions and the shipped period policy
  * @description     Username is resolved, not assumed; turn-start only, permissive (TD-02)
  * @file            plugins/ai-core/webapp/utils/agent/quota.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import AiUsageModel from '../../model/aiUsage.js';
@@ -156,6 +156,24 @@ function settleIdentity(ctx) {
     return { ...base, username, day: base.day || periodKey('day', now) };
 }
 
+function quotaLimitLabel(cap) {
+    const dimension = cap && cap.dimension;
+    const period = cap && cap.period;
+    if (dimension === 'requests' && period === 'day') return 'Daily request cap per user';
+    if (dimension === 'tokens' && period === 'day') return 'Daily token cap per user';
+    if (dimension === 'cost' && period === 'month') return 'Monthly cost cap per user (USD)';
+    if (dimension === 'requests' && period === 'month') return 'Monthly request cap';
+    if (dimension === 'tokens' && period === 'month') return 'Monthly token cap';
+    if (dimension === 'cost' && period === 'day') return 'Daily cost cap (USD)';
+    return 'usage cap';
+}
+
+function quotaExceededMessage(cap) {
+    const label = quotaLimitLabel(cap);
+    const limit = cap && cap.dimension === 'cost' ? `$${cap.limit}` : String(cap && cap.limit);
+    return `The ${label} of ${limit} is reached. You can contact a site admin for details.`;
+}
+
 /**
  * Shipped onAiQuotaCheck. Priority 1000 so a site handler at default 100 can replace it
  * by returning { username, caps }.
@@ -175,7 +193,7 @@ export async function onAiQuotaCheck(ctx) {
             const err = new Error(
                 exceeded.costUnknown
                     ? 'Quota cost is partly unknown; refusing new turns until it is resolved.'
-                    : `Quota exceeded: ${cap.dimension} / ${cap.period} limit ${cap.limit}`
+                    : quotaExceededMessage(cap)
             );
             err.code = 'AI_QUOTA_EXCEEDED';
             err.cap = exceeded;

@@ -2,13 +2,13 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Attachments
  * @tagline         Sources, ingest, convert, images, and loop purity
  * @file            plugins/ai-core/webapp/tests/unit/attachments.test.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { afterEach, describe, expect, test } from '@jest/globals';
@@ -275,8 +275,11 @@ describe('ingest', () => {
     test('each UrlFetch code maps to a message', () => {
         expect(clientFetchMessage({ code: 'SCHEME_NOT_ALLOWED' })).toMatch(/http and https/i);
         expect(clientFetchMessage({ code: 'HOST_NOT_ALLOWED', details: { host: 'evil.test' } })).toContain('evil.test');
+        expect(clientFetchMessage({ code: 'HOST_NOT_ALLOWED', details: { host: 'evil.test' } })).toMatch(/contact a site admin for details/);
+        expect(clientFetchMessage({ code: 'HOST_NOT_ALLOWED', details: { host: 'evil.test' } })).not.toMatch(/Site Configuration/);
         expect(clientFetchMessage({ code: 'PRIVATE_ADDRESS' })).toMatch(/Private/);
-        expect(clientFetchMessage({ code: 'RESPONSE_TOO_LARGE' })).toMatch(/size cap/);
+        expect(clientFetchMessage({ code: 'RESPONSE_TOO_LARGE' })).toMatch(/URL size limit/);
+        expect(clientFetchMessage({ code: 'RESPONSE_TOO_LARGE' })).toMatch(/contact a site admin for details/);
         expect(clientFetchMessage({ code: 'CONTENT_TYPE_NOT_ALLOWED', details: { contentType: 'image/png' } })).toContain('image/png');
         expect(clientFetchMessage({ code: 'AI_SOURCE_EMPTY_SHELL' })).toBe(EMPTY_SHELL_MESSAGE);
     });

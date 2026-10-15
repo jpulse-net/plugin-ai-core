@@ -1,4 +1,4 @@
-# jPulse Framework / Plugins / AI Core Plugin v1.0.20
+# jPulse Framework / Plugins / AI Core Plugin v1.0.21
 
 AI agent for a jPulse site: tools, turns, quota, HTTP/SSE or WebSocket, `jPulse.ai.panel`, attachments, and propose/apply. Ships as `@jpulse-net/plugin-ai-core` together with `ai-mock` and the `hello-ai` sample.
 
@@ -100,6 +100,7 @@ npx jest plugins/ai-core/webapp/tests/unit/turn-loop.test.js --runInBand
 
 ## Plugin releases
 
+- **1.0.21**, W-267, 2026-10-15: A failed turn that stores no error stays on screen until the user switches conversations or reloads. A limit message names what was hit and says to contact a site admin. A disallowed host names the host. When Max rounds per turn is not saved, `app.conf` `controller.aiAgent.maxRoundsPerTurn` is used if it is a positive number; a saved number, including 8, wins; otherwise the default is 8. `ai-mock` and `hello-ai` lockstep.
 - **1.0.20**, W-264, 2026-10-08: Links to Site Configuration → AI Agent open that tab (`/admin/config.shtml#ai-tab`). The usage page Day/Month switch lines up with the settings button. The empty-usage sentence above the cards is gone; empty tables still say so. A host that is not allowed names that same address. Requires jPulse Framework >= 2.0.12. `ai-mock` and `hello-ai` lockstep.
 - **1.0.19**, W-258, 2026-10-01: Usage is one record per day, user, model, and scope. The usage page has a Day/Month switch, cards, and breakdowns by user, model, and scope. Cap settings are `maxUserRequestsPerDay`, `maxUserTokensPerDay`, and `maxUserCostPerMonth` (`0` means no cap). A long conversation keeps the newest turns. A page with one article per section is read whole. A page with almost no text says the content loads dynamically; a failed fetch from the prompt shows that message and does not send the turn. Drop `aiUsage` and rename the two daily cap keys before starting (see Upgrade). `ai-mock` and `hello-ai` lockstep.
 - **1.0.18**, W-253, 2026-09-30: Model rows in `/model` and on the AI Core page show the provider's icon from its `plugin.json`, with the AI Core icon as fallback. `/help`, examples, `/model`, and `/conversations` render as aligned lists; examples get a bullet. Retry waits and the Retry-After cap are Site Configuration → AI Agent settings (defaults unchanged). `ai-mock` and `hello-ai` lockstep.

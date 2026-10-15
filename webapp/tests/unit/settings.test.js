@@ -2,19 +2,20 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Settings
  * @tagline         mergeSettings and plugin-config debugDumps
  * @file            plugins/ai-core/webapp/tests/unit/settings.test.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { afterEach, describe, expect, test } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import {
+    appConfMaxRounds,
     cacheSettings,
     DEFAULT_RETRY_AFTER_CAP_MS,
     DEFAULT_RETRY_WAIT_MS,
@@ -59,6 +60,18 @@ describe('settings', () => {
         });
         expect(custom.maxConvertBytes).toBe(1048576);
         expect(custom.defaultToolTimeoutMs).toBe(35000);
+    });
+
+    test('missing max rounds uses app.conf, and a saved number wins', () => {
+        const prev = global.appConfig;
+        global.appConfig = { controller: { aiAgent: { maxRoundsPerTurn: 16 } } };
+        expect(appConfMaxRounds()).toBe(16);
+        expect(mergeSettings({ site: {} }).maxRoundsPerTurn).toBe(16);
+        expect(mergeSettings({ site: { maxRoundsPerTurn: 8 } }).maxRoundsPerTurn).toBe(8);
+        global.appConfig = { controller: { aiAgent: {} } };
+        expect(appConfMaxRounds()).toBeNull();
+        expect(mergeSettings({ site: {} }).maxRoundsPerTurn).toBe(8);
+        global.appConfig = prev;
     });
 
     test('app.conf ai section has no effect', () => {

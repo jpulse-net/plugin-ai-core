@@ -3,13 +3,13 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import { createBudgetState, executeTool, resolveTools, stripMedia } from '../tools/index.js';
@@ -119,6 +119,10 @@ function formatResponseDebugLine(info) {
         + `; textLen=${text.length}; tokensIn=${info.tokensIn || 0}; tokensOut=${info.tokensOut || 0}`
         + `; text=${JSON.stringify(clipped)}`
     ).replace(/[\r\n]+/g, ' ');
+}
+
+function turnTimeoutMessage() {
+    return 'This turn timed out before it finished. You can contact a site admin for details.';
 }
 
 function logLine(req, method, message, actor) {
@@ -308,7 +312,7 @@ export async function runTurn(params) {
         while (!stop && round < maxRounds) {
             if (Date.now() - startedAt > timeoutMs) {
                 status = 'failed';
-                throw Object.assign(new Error('Turn timed out'), { code: 'AI_TIMEOUT' });
+                throw Object.assign(new Error(turnTimeoutMessage()), { code: 'AI_TIMEOUT' });
             }
             if (turnStopped(String(thread._id), params.abortSignal)) {
                 status = 'canceled';
@@ -443,7 +447,7 @@ export async function runTurn(params) {
 
             if (Date.now() - startedAt > timeoutMs) {
                 status = 'failed';
-                throw Object.assign(new Error('Turn timed out'), { code: 'AI_TIMEOUT' });
+                throw Object.assign(new Error(turnTimeoutMessage()), { code: 'AI_TIMEOUT' });
             }
             if (turnStopped(String(thread._id), params.abortSignal)) {
                 status = 'canceled';
@@ -549,7 +553,7 @@ export async function runTurn(params) {
             sink({
                 type: 'error',
                 code: 'AI_MAX_ROUNDS',
-                message: `Stopped after ${maxRounds} rounds`
+                message: `Stopped after ${maxRounds} rounds. The agent used every tool round before it finished. You can contact a site admin for details.`
             });
         }
 

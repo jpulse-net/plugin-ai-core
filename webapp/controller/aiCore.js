@@ -3,13 +3,13 @@
  * @tagline         AI agent controller, hooks, and global.AiCore
  * @description     Defines the hook catalog, publishes AiCore, and serves HTTP/SSE turns
  * @file            plugins/ai-core/webapp/controller/aiCore.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 import {
@@ -80,7 +80,7 @@ import {
     sanitizeImageMeta,
     sanitizeSourceMeta
 } from '../utils/attachments/stream.js';
-import { AI_CONFIG_DEFAULTS } from '../utils/agent/settings.js';
+import { AI_CONFIG_DEFAULTS, appConfMaxRounds } from '../utils/agent/settings.js';
 
 const LogController = global.LogController;
 const CommonUtils = global.CommonUtils;
@@ -329,7 +329,7 @@ class AiCoreController {
                     },
                     maxRoundsPerTurn: {
                         type: 'number',
-                        default: 8,
+                        default: appConfMaxRounds() ?? 8,
                         label: '{{i18n.view.ui.ai.config.maxRoundsPerTurn}}'
                     },
                     turnTimeoutMs: {
@@ -1234,7 +1234,7 @@ class AiCoreController {
                 return sendError(req, res, 400, `Unsupported image type ${mimeType || 'unknown'}`, 'AI_IMAGE_TYPE');
             }
             if (bytes.length > cap) {
-                return sendError(req, res, 413, 'Image is over the size cap', 'PAYLOAD_TOO_LARGE');
+                return sendError(req, res, 413, 'This image is over the size limit. You can contact a site admin for details.', 'PAYLOAD_TOO_LARGE');
             }
             const threadId = headerOrQuery(req, 'x-ai-thread-id');
             const imageId = headerOrQuery(req, 'x-ai-image-id')

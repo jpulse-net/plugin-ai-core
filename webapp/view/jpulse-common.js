@@ -3,13 +3,13 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.20
- * @release         2026-10-08
+ * @version         1.0.21
+ * @release         2026-10-15
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net
- * @genai           80%, Cursor 3.20, Grok 4.6
+ * @genai           80%, Cursor 3.21, Grok 4.7
  */
 
 if (!window.jPulse) {
@@ -124,7 +124,8 @@ if (!window.jPulse) {
         visionGated: '{{i18n.view.ui.ai.attach.visionGated}}',
         imagesUnavailable: '{{i18n.view.ui.ai.attach.imagesUnavailable}}',
         noConverter: '{{i18n.view.ui.ai.attach.noConverter}}',
-        oversizeFile: '{{i18n.view.ui.ai.attach.oversizeFile}}',
+        oversizeImage: '{{i18n.view.ui.ai.attach.oversizeImage}}',
+        oversizeConvert: '{{i18n.view.ui.ai.attach.oversizeConvert}}',
         usedSources: '{{i18n.view.ui.ai.attach.usedSources}}'
     };
     const PANEL_TOOLS = { list_sources: true, get_source: true };
@@ -1549,7 +1550,7 @@ if (!window.jPulse) {
             const maxCount = cap.maxSourcesPerConversation || 5;
             const maxChars = cap.maxSourceChars || 1000000;
             if (state.sources.length >= maxCount) {
-                showToast(`This conversation already has ${maxCount} sources, the maximum.`, 'error');
+                showToast(`This conversation already has ${maxCount} sources, the maximum. You can contact a site admin for details.`, 'error');
                 return null;
             }
             let body = String(text || '');
@@ -1705,7 +1706,7 @@ if (!window.jPulse) {
             if (kind.image) {
                 const imageCap = (state.capability && state.capability.maxImageBytes) || 4194304;
                 if (fileOverCap(file, imageCap)) {
-                    showToast(fillToken(I18N.oversizeFile, '%SIZE%', formatCapBytes(imageCap)), 'error');
+                    showToast(fillToken(I18N.oversizeImage, '%SIZE%', formatCapBytes(imageCap)), 'error');
                     flashDropRefuse();
                     return;
                 }
@@ -1715,7 +1716,7 @@ if (!window.jPulse) {
             if (kind.convert) {
                 const convertCap = (state.capability && state.capability.maxConvertBytes) || 26214400;
                 if (fileOverCap(file, convertCap)) {
-                    showToast(fillToken(I18N.oversizeFile, '%SIZE%', formatCapBytes(convertCap)), 'error');
+                    showToast(fillToken(I18N.oversizeConvert, '%SIZE%', formatCapBytes(convertCap)), 'error');
                     flashDropRefuse();
                     return;
                 }
@@ -2130,8 +2131,12 @@ if (!window.jPulse) {
             const html = [];
             for (const item of items) {
                 if (item.kind === 'local') {
-                    html.push(`<article class="plg-ai-turn plg-ai-turn--local"><div class="plg-ai-user">${escapeHtml(item.local.userText || '')}</div>`);
-                    html.push(`<div class="plg-ai-agent" data-ai-local="${item.seq}"></div></article>`);
+                    const ephemeral = item.local.ephemeral ? ' plg-ai-ephemeral' : '';
+                    html.push('<article class="plg-ai-turn plg-ai-turn--local">');
+                    if (item.local.userText) {
+                        html.push(`<div class="plg-ai-user">${escapeHtml(item.local.userText)}</div>`);
+                    }
+                    html.push(`<div class="plg-ai-agent${ephemeral}" data-ai-local="${item.seq}"></div></article>`);
                     continue;
                 }
                 html.push(await renderTurnHtml(item.turn));
@@ -2214,6 +2219,7 @@ if (!window.jPulse) {
                 return;
             }
             state.turns = res.data || [];
+            dropShownEphemeral();
             applyThreadModel(currentThread());
             const running = state.turns.some((turn) => turn.status === 'running');
             setRunning(running);
@@ -2471,6 +2477,34 @@ if (!window.jPulse) {
 
         function slashDisplay(cmd) {
             return cmd.arg ? `/${cmd.name} ${cmd.arg}` : `/${cmd.name}`;
+        }
+
+        function noteEphemeral(message) {
+            const text = String(message || '').trim();
+            if (!text) {
+                return;
+            }
+            const last = state.locals[state.locals.length - 1];
+            if (last && last.ephemeral && last.agentText === text) {
+                return;
+            }
+            state.locals.push({
+                userText: '',
+                agentText: text,
+                agentNode: null,
+                at: Date.now(),
+                ephemeral: true
+            });
+        }
+
+        function dropShownEphemeral() {
+            state.locals = state.locals.filter((local) => {
+                if (!local.ephemeral) {
+                    return true;
+                }
+                const text = String(local.agentText || '');
+                return !state.turns.some((turn) => !turn.agentText && turn.error && String(turn.error) === text);
+            });
         }
 
         async function appendLocal(userText, agentReply) {
@@ -2886,7 +2920,9 @@ if (!window.jPulse) {
             if (event.type === 'completed' || event.type === 'canceled' || event.type === 'stalled' || event.type === 'error') {
                 setRunning(false);
                 if (event.type === 'error') {
-                    showToast(event.message || I18N.error, 'error');
+                    const message = event.message || I18N.error;
+                    showToast(message, 'error');
+                    noteEphemeral(message);
                 }
                 showNotice('', false);
                 emitRegionEvent('turn');
