@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Retention
  * @tagline         Turn purge at startup and every 24 hours
  * @file            plugins/ai-core/webapp/tests/unit/retention.test.js
- * @version         1.0.21
- * @release         2026-10-15
+ * @version         1.0.22
+ * @release         2026-10-16
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @license         BSL 1.1 -- see LICENSE file; for commercial use: team@jpulse.net

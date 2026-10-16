@@ -3,8 +3,8 @@
  * @tagline         jPulse.ai client: panel, transport, tool modules
  * @description     Appended to the framework jpulse-common.js (W-098)
  * @file            plugins/ai-core/webapp/view/jpulse-common.js
- * @version         1.0.21
- * @release         2026-10-15
+ * @version         1.0.22
+ * @release         2026-10-16
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -3765,12 +3765,26 @@ if (!window.jPulse) {
             attachmentFile: function (id) {
                 return panelStore.files.get(id) || null;
             },
+            sourceText: function (id) {
+                const src = state.sources.find((row) => row && row.id === id);
+                if (!src) {
+                    return null;
+                }
+                return {
+                    id: src.id,
+                    name: src.name || '',
+                    mimeType: src.mimeType || '',
+                    text: src.text || '',
+                    truncated: !!(src.truncated || (src.provenance && src.provenance.truncated))
+                };
+            },
             destroy: destroy,
             setTitle: setTitle
         };
         if (handle) {
             handle.attachments = panelApi.attachments;
             handle.attachmentFile = panelApi.attachmentFile;
+            handle.sourceText = panelApi.sourceText;
             handle.destroy = destroy;
             handle.setTitle = setTitle;
             handle.regions = {

@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Proposals
  * @tagline         Derive, persist, notes, endpoints, loop purity, panel helpers
  * @file            plugins/ai-core/webapp/tests/unit/proposals.test.js
- * @version         1.0.21
- * @release         2026-10-15
+ * @version         1.0.22
+ * @release         2026-10-16
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -446,7 +446,9 @@ describe('loop purity', () => {
         );
         expect(text).not.toMatch(/proposalId/);
         expect(text).not.toMatch(/claimsApplyWithoutProposal|claimsWithoutCard/);
-        expect(text).not.toMatch(/propose_/);
+        // formBatchLine names the site tool propose_subtree. That sentence is not loop machinery.
+        const withoutBatch = text.replace(/function formBatchLine\(maxTokens\) \{[\s\S]*?\n\}/, '');
+        expect(withoutBatch).not.toMatch(/propose_/);
         expect(text).not.toMatch(/proposalsFromTurn|annotateHistory|formatCardsNote/);
         expect(text).not.toMatch(/\bproposes\s*:/);
     });

@@ -3,8 +3,8 @@
  * @tagline         Provider-neutral turn loop
  * @description     Reserve, lease, rounds, live emit, array tool calls; no propose/apply
  * @file            plugins/ai-core/webapp/utils/agent/turnLoop.js
- * @version         1.0.21
- * @release         2026-10-15
+ * @version         1.0.22
+ * @release         2026-10-16
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -31,6 +31,42 @@ export const RETRYABLE_WAIT_MS = DEFAULT_RETRY_WAIT_MS;
 const DEBUG_PRIOR_MAX = 1500;
 const DEBUG_TEXT_MAX = 400;
 const AUTO_TITLE_MAX = 60;
+
+// A verbose record (several fields plus a title) is about 150 output tokens.
+// Leave 1000 tokens for the form bubble and the tool wrapper. Cap at 40 so a
+// large output setting still stays inside one proposal card's comfortable size.
+export function formRecordBudget(maxTokens) {
+    const cap = Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 4096;
+    const n = Math.floor((cap - 1000) / 150);
+    if (n < 8) return 8;
+    if (n > 40) return 40;
+    return n;
+}
+
+function formBatchLine(maxTokens) {
+    const n = formRecordBudget(maxTokens);
+    return 'An attached CSV or spreadsheet is copied by the page, not written by you. '
+        + 'propose_subtree takes the form in tree, or [] when the form is already on the map, and records: { sourceId, columns }. '
+        + 'columns maps each field key to the header text, such as { "sku": "SKU", "name": "Name" }. '
+        + 'Read only the header and two sample rows with get_source. Do not write formData for those rows. '
+        + 'Do not set records.count. If they asked for all the rows, that means every row. '
+        + 'One call copies every data row, up to 500 on the card. '
+        + 'For a workbook with more than one sheet, set records.sheet. '
+        + 'Only when the sheet is longer than 500 does the reply give the next records.start. '
+        + 'A table pasted in the message is not a source. The 20-record limit is only for that pasted table. '
+        + 'That pasted call can include the form and at most ' + n
+        + ' records, even if more rows were asked for. Each of those pasted records is formRef and formData only. '
+        + 'Do not set a title, icon, notes, or children on a pasted record. '
+        + 'titleFormat is a formula. One line of chosen fields is = JOIN(B($name, $sku), ", "). '
+        + 'Do not use {{ }} or any other template syntax. '
+        + 'The separator in that JOIN is a comma and a space, not a space alone. '
+        + 'A column whose values are dates, such as 12/10/2017, is a date field. The page stores 2017-12-10. Do not mark that column as text. '
+        + 'A column whose values are ISO date-times, such as 2017-12-10T15:30:00Z, is a datetime field. The page stores that string as written. '
+        + 'Further pasted rows wait until they Apply and ask for the next batch. '
+        + 'A longer pasted call is cut off and does not become a card. '
+        + 'A search table is a propose_subtree node with searchQuery only, such as form:#inventory-form. '
+        + 'Do not use TABLE() or in:self for it. The page builds that report.';
+}
 
 /**
  * @param {{ waits?: number[], capMs?: number }} [retry] - from settings
@@ -309,6 +345,7 @@ export async function runTurn(params) {
 
         let round = 0;
         let stop = false;
+        let truncatedRetries = 0;
         while (!stop && round < maxRounds) {
             if (Date.now() - startedAt > timeoutMs) {
                 status = 'failed';
@@ -328,12 +365,15 @@ export async function runTurn(params) {
                 ...extras.resolve
             });
             lastScope = resolved.scope || lastScope;
+            const siteInstructions = [settings.siteInstructions, formBatchLine(provider.maxTokens)]
+                .filter(text => text && String(text).trim())
+                .join('\n\n');
             const prompt = await assemblePrompt({
                 actor,
                 scope: resolved.scope,
                 tools: resolved.tools,
                 withheld: resolved.withheld,
-                siteInstructions: settings.siteInstructions,
+                siteInstructions,
                 context: params.context,
                 target: params.target,
                 hookManager,
@@ -462,6 +502,32 @@ export async function runTurn(params) {
                     tokensIn: usage.tokensIn,
                     tokensOut: usage.tokensOut
                 }), actor);
+            }
+
+            const truncatedEvents = roundEvents.filter(event => event && event.type === 'tool_use_truncated');
+            const hasCalls = toolUse && Array.isArray(toolUse.calls) && toolUse.calls.length;
+            if (truncatedEvents.length && !hasCalls) {
+                const cutName = truncatedEvents.map(event => event.name).filter(Boolean).join(', ') || 'the tool';
+                const batchLine = formBatchLine(provider.maxTokens);
+                if (truncatedRetries < 1 && round + 1 < maxRounds) {
+                    truncatedRetries += 1;
+                    const nudge = 'The call to ' + cutName + ' was cut off before it finished, so it did not run. '
+                        + batchLine;
+                    const lastMsg = messages[messages.length - 1];
+                    if (lastMsg && lastMsg.role === 'user' && typeof lastMsg.content === 'string') {
+                        lastMsg.content += '\n\n' + nudge;
+                    } else {
+                        messages.push({ role: 'user', content: nudge });
+                    }
+                    round += 1;
+                    continue;
+                }
+                const note = 'The reply was cut off before the change could be proposed. '
+                    + batchLine;
+                agentText = agentText ? (agentText + '\n' + note) : note;
+                status = 'completed';
+                stop = true;
+                break;
             }
 
             if (toolUse && Array.isArray(toolUse.calls) && toolUse.calls.length) {

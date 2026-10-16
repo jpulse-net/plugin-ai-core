@@ -2,8 +2,8 @@
  * @name            jPulse Framework / Plugins / AI Core / WebApp / Tests / Unit / Turn Loop
  * @tagline         Rounds, array tool calls, retry, cancel, timeout, lease, live emit
  * @file            plugins/ai-core/webapp/tests/unit/turn-loop.test.js
- * @version         1.0.21
- * @release         2026-10-15
+ * @version         1.0.22
+ * @release         2026-10-16
  * @repository      https://github.com/jpulse-net/plugin-ai-core
  * @author          Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
  * @copyright       2026 Peter Thoeny, https://twiki.org & https://github.com/peterthoeny/
@@ -510,6 +510,8 @@ describe('turn loop', () => {
         });
         expect(events.some(event => event.type === 'tool_use_truncated')).toBe(true);
         expect(result.status).toBe('completed');
+        expect(result.turn.agentText).toMatch(/cut off/);
+        expect(result.turn.agentText).toMatch(/at most 20 records/);
     });
 
     test('text delta is observable at the sink before the provider hook resolves', async () => {
